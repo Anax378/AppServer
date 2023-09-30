@@ -1,4 +1,4 @@
-package org.example.VirtualFileSystem;
+package net.anax.VirtualFileSystem;
 
 import java.util.HashMap;
 

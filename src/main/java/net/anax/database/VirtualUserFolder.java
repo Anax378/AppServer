@@ -1,8 +1,7 @@
-package org.example.database;
+package net.anax.database;
 
-import org.example.VirtualFileSystem.AbstractVirtualFolder;
-import org.example.VirtualFileSystem.VirtualFile;
-import org.example.logging.Logger;
+import net.anax.VirtualFileSystem.AbstractVirtualFolder;
+import net.anax.VirtualFileSystem.VirtualFile;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 

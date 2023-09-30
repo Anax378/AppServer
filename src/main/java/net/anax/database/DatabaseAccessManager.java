@@ -1,10 +1,10 @@
-package org.example.database;
+package net.anax.database;
 
-import org.example.VirtualFileSystem.AbstractVirtualFolder;
-import org.example.VirtualFileSystem.VirtualFile;
-import org.example.VirtualFileSystem.VirtualFolder;
-import org.example.VirtualFileSystem.VirtualPathNode;
-import org.example.logging.Logger;
+import net.anax.VirtualFileSystem.AbstractVirtualFolder;
+import net.anax.VirtualFileSystem.VirtualFile;
+import net.anax.VirtualFileSystem.VirtualFolder;
+import net.anax.VirtualFileSystem.VirtualPathNode;
+import net.anax.logging.Logger;
 
 import java.sql.*;
 

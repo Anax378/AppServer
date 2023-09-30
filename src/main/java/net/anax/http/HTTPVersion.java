@@ -1,4 +1,4 @@
-package org.example.http;
+package net.anax.http;
 
 public enum HTTPVersion {
     HTTP_1_1("HTTP/1.1");

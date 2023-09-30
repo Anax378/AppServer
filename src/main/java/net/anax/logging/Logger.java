@@ -1,4 +1,4 @@
-package org.example.logging;
+package net.anax.logging;
 
 public class Logger {
 

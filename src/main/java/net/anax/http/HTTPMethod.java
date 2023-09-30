@@ -1,4 +1,4 @@
-package org.example.http;
+package net.anax.http;
 
 public enum HTTPMethod {
     GET, HEAD

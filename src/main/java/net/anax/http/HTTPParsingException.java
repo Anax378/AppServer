@@ -1,4 +1,4 @@
-package org.example.http;
+package net.anax.http;
 
 public class HTTPParsingException extends Exception{
     private HTTPStatusCode statusCode;

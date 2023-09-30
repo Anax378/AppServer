@@ -1,6 +1,6 @@
-package org.example.main;
+package net.anax.main;
 
-import org.example.thread.ListenerThread;
+import net.anax.thread.ListenerThread;
 
 import java.io.IOException;
 import java.net.ServerSocket;

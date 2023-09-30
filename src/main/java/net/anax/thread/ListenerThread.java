@@ -1,4 +1,4 @@
-package org.example.thread;
+package net.anax.thread;
 
 import java.io.IOException;
 import java.net.ServerSocket;

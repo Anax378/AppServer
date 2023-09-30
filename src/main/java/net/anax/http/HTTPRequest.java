@@ -1,4 +1,4 @@
-package org.example.http;
+package net.anax.http;
 
 import java.util.HashMap;
 

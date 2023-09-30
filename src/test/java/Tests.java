@@ -1,4 +1,4 @@
-import org.example.http.*;
+import net.anax.http.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;

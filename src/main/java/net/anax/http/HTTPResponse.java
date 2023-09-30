@@ -1,8 +1,7 @@
-package org.example.http;
+package net.anax.http;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.http.HttpHeaders;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
