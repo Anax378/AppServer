@@ -2,7 +2,6 @@ package net.anax.thread;
 
 import net.anax.database.DatabaseAccessManager;
 import net.anax.http.*;
-import org.example.http.*;
 
 import java.io.IOException;
 import java.io.InputStream;
