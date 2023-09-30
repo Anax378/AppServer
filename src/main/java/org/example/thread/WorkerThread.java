@@ -1,5 +1,6 @@
 package org.example.thread;
 
+import org.example.database.DatabaseAccessManager;
 import org.example.http.*;
 
 import java.io.IOException;
@@ -41,9 +42,17 @@ public class WorkerThread extends Thread{
 
             try {
                 HTTPRequest request = parser.parseRequest(inputStream);
-                //TODO: handle request
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
-                response.setBody("Hi Suckers!!");
+
+                //TODO: handle request
+
+                String body = DatabaseAccessManager.getInstance().getDataFromURI(request.getURI());
+                if(body == null){
+                    response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
+                    response.setBody("404 not found");
+                }else{
+                    response.setBody(body);
+                }
                 response.writeOnStream(outputStream);
 
             } catch (HTTPParsingException e) {

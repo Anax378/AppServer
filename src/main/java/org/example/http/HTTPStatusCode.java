@@ -7,6 +7,7 @@ public enum HTTPStatusCode {
     CLIENT_ERROR_414_URI_TOO_LONG(414, "URI Too Long"),
     CLIENT_ERROR_408_REQUEST_TIMEOUT(408, "Request Timeout"),
     CLIENT_ERROR_413_REQUEST_TOO_LARGE(413, "Request Too Large"),
+    CLIENT_ERROR_404_NOT_FOUND(404, "Not Found"),
     SERVER_ERROR_500_INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
     SERVER_ERROR_501_NOT_IMPLEMENTED(501, "Not Implemented"),
     OK_200(200, "OK");
