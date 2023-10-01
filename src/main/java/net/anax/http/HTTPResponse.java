@@ -26,7 +26,7 @@ public class HTTPResponse {
         this.body = body;
     }
 
-    void setHeader(HTTPHeaderType headerType, String content){
+    public void setHeader(HTTPHeaderType headerType, String content){
         if(content.equals("")){
             headers.remove(headerType);
             return;

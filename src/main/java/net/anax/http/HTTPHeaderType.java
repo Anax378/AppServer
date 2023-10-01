@@ -11,6 +11,7 @@ public enum HTTPHeaderType {
     Accept_language("Accept-Language"),
     Accept_Encoding("Accept-Encoding"),
     Refer("Refer"),
+    Access_Control_Allow_Origin("Access-Control-Allow-Origin"),
     Origin("Origin");
 
     String name;
