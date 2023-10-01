@@ -108,7 +108,6 @@ public class VirtualUserFolder extends AbstractVirtualFolder {
             while(result.next()){
                 array.add(result.getInt("id"));
             }
-            if(array.isEmpty()){return null;}
             data.put("ids", array);
             return data.toJSONString();
         } catch (SQLException e) {

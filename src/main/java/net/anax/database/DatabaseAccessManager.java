@@ -27,9 +27,9 @@ public class DatabaseAccessManager {
             @Override
             public AbstractVirtualFolder getFolder(String name) {
                 try{
+                    if(connection.isClosed()){connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");}
                     int user_id = Integer.parseInt(name);
-                    String sdlQuery = "SELECT * FROM user WHERE id = ?";
-                    PreparedStatement statement = connection.prepareStatement(sdlQuery);
+                    PreparedStatement statement = connection.prepareStatement("SELECT * FROM user WHERE id = ?");
                     statement.setString(1, ""+user_id);
                     ResultSet result = statement.executeQuery();
                     if(result.next()){
@@ -53,11 +53,37 @@ public class DatabaseAccessManager {
                 return null;
             }
         };
+        AbstractVirtualFolder CLASSES = new AbstractVirtualFolder("classes") {
+            @Override
+            public AbstractVirtualFolder getFolder(String name) {
+                try {
+                    if(connection.isClosed()){connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");}
+                    int class_id = Integer.parseInt(name);
+                    PreparedStatement statement = connection.prepareStatement("SELECT * FROM class WHERE class.id = ?");
+                    statement.setString(1, ""+class_id);
+                    ResultSet result = statement.executeQuery();
+                    if(result.next()){
+                        return new VirtualClassFolder(""+class_id, connection);
+                    }
+                    return null;
+
+                } catch (SQLException e) {
+                    Logger.log("SQL exception for the name " + name);
+                    return null;
+                } catch (NumberFormatException e){
+                    Logger.log("invalid number format for " + name);
+                    return null;
+                }
+            }
+
+            @Override
+            public VirtualFile getFile(String name) {
+                return null;
+            }
+        };
 
         ROOT_FOLDER.addFolder(USERS);
-
-
-
+        ROOT_FOLDER.addFolder(CLASSES);
 
     }
     public static DatabaseAccessManager getInstance(){
