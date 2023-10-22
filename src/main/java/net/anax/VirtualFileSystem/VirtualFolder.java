@@ -19,7 +19,7 @@ public class VirtualFolder extends AbstractVirtualFolder{
     }
 
     @Override
-    public AbstractVirtualFolder getFolder(String folderName){
+    public AbstractVirtualFolder getFolder(String folderName,  AuthorizationProfile auth){
         if(folders.containsKey(folderName)){
             return folders.get(folderName);
         }
@@ -35,7 +35,7 @@ public class VirtualFolder extends AbstractVirtualFolder{
     }
 
     @Override
-    public VirtualFile getFile(String fileName){
+    public VirtualFile getFile(String fileName,  AuthorizationProfile auth){
         if(files.containsKey(fileName)){
             return files.get(fileName);
         }

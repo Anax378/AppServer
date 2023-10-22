@@ -1,6 +1,7 @@
 package net.anax.database;
 
 import net.anax.VirtualFileSystem.AbstractVirtualFolder;
+import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.VirtualFileSystem.VirtualFile;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -16,13 +17,13 @@ public class VirtualUserFolder extends AbstractVirtualFolder {
     }
 
     @Override
-    public AbstractVirtualFolder getFolder(String name) {
+    public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
         if(Objects.equals(name, "id")){return this;}
         return null;
     }
 
     @Override
-    public VirtualFile getFile(String name) {
+    public VirtualFile getFile(String name,  AuthorizationProfile auth) {
         String data = null;
         switch (name){
             case "username" -> data = getUsername();

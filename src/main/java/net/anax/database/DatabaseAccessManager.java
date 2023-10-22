@@ -1,9 +1,6 @@
 package net.anax.database;
 
-import net.anax.VirtualFileSystem.AbstractVirtualFolder;
-import net.anax.VirtualFileSystem.VirtualFile;
-import net.anax.VirtualFileSystem.VirtualFolder;
-import net.anax.VirtualFileSystem.VirtualPathNode;
+import net.anax.VirtualFileSystem.*;
 import net.anax.logging.Logger;
 
 import java.sql.*;
@@ -25,7 +22,7 @@ public class DatabaseAccessManager {
         }
         AbstractVirtualFolder USERS = new AbstractVirtualFolder("users") {
             @Override
-            public AbstractVirtualFolder getFolder(String name) {
+            public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
                 try{
                     if(connection.isClosed()){connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");}
                     int user_id = Integer.parseInt(name);
@@ -49,13 +46,13 @@ public class DatabaseAccessManager {
             }
 
             @Override
-            public VirtualFile getFile(String name) {
+            public VirtualFile getFile(String name,  AuthorizationProfile auth) {
                 return null;
             }
         };
         AbstractVirtualFolder CLASSES = new AbstractVirtualFolder("classes") {
             @Override
-            public AbstractVirtualFolder getFolder(String name) {
+            public AbstractVirtualFolder getFolder(String name,  AuthorizationProfile auth) {
                 try {
                     if(connection.isClosed()){connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");}
                     int class_id = Integer.parseInt(name);
@@ -77,7 +74,7 @@ public class DatabaseAccessManager {
             }
 
             @Override
-            public VirtualFile getFile(String name) {
+            public VirtualFile getFile(String name, AuthorizationProfile auth) {
                 return null;
             }
         };
@@ -93,7 +90,7 @@ public class DatabaseAccessManager {
         return instance;
     }
 
-    public String getDataFromURI(String URI){
+    public String getDataFromURI(String URI,  AuthorizationProfile auth){
         if(URI.charAt(0) == '/'){
             URI = URI.substring(1);
         }
@@ -104,7 +101,7 @@ public class DatabaseAccessManager {
         for(int i = parts.length - 1; i >= 0; i--){
             lastNode = new VirtualPathNode(parts[i], lastNode);
         }
-        VirtualFile file = ROOT_FOLDER.getFileFromPATH(lastNode);
+        VirtualFile file = ROOT_FOLDER.getFileFromPATH(lastNode, auth);
         if(file != null){
             return file.readData();
         }
