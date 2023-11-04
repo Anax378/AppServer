@@ -13,7 +13,7 @@ import java.sql.*;
 
 public class DatabaseAccessManager {
     private static DatabaseAccessManager instance;
-    private VirtualFolder ROOT_FOLDER;
+    private AbstractVirtualNode ROOT_NODE;
 
     private SpecifiedDatabaseStructure specificDatabase = null;
 
@@ -50,7 +50,7 @@ public class DatabaseAccessManager {
 
         specificDatabase = SpecifiedDatabaseStructure.getINSTANCE();
         specificDatabase.setConnection(connection);
-        ROOT_FOLDER = specificDatabase.getROOT();
+        ROOT_NODE = specificDatabase.getROOT();
 
     }
 
@@ -73,7 +73,7 @@ public class DatabaseAccessManager {
         for(int i = parts.length - 1; i >= 0; i--){
             lastNode = new VirtualPathNode(parts[i], lastNode);
         }
-        VirtualFile file = ROOT_FOLDER.getFileFromPATH(lastNode, auth);
+        AbstractVirtualNode file = ROOT_NODE.getFileFromPATH(lastNode, auth);
         if(file != null){
             return file.readData(auth);
         }

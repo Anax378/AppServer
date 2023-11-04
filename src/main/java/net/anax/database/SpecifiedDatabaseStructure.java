@@ -1,9 +1,7 @@
 package net.anax.database;
 
-import net.anax.VirtualFileSystem.AbstractVirtualFolder;
-import net.anax.VirtualFileSystem.AuthorizationProfile;
-import net.anax.VirtualFileSystem.VirtualFile;
-import net.anax.VirtualFileSystem.VirtualFolder;
+import net.anax.VirtualFileSystem.*;
+import net.anax.logging.Logger;
 import net.anax.util.DatabaseUtilities;
 import net.anax.util.StringUtilities;
 import org.json.simple.JSONArray;
@@ -18,55 +16,46 @@ public class SpecifiedDatabaseStructure {
 
     private static SpecifiedDatabaseStructure INSTANCE = null;
     private Connection connection;
-    private VirtualFolder ROOT = new VirtualFolder("root");
+    private AbstractVirtualNode ROOT_NODE;
     SpecifiedDatabaseStructure(){
-        AbstractVirtualFolder USERS = new AbstractVirtualFolder("users"){
+        AbstractVirtualNode USERS = new AbstractVirtualNode() {
             @Override
-            public VirtualFile getFile(String fileName, AuthorizationProfile auth) {
-                //TODO: implement user summaries;
-                return null;
-            }
-            @Override
-            public AbstractVirtualFolder getFolder(String folderName, AuthorizationProfile auth) {
-                if(!StringUtilities.isInteger(folderName)){return null;}
-                int id = Integer.parseInt(folderName);
-                return new VirtualUserFolder(id, connection);
-            }
-        };
-        AbstractVirtualFolder GROUPS = new AbstractVirtualFolder("groups") {
-            @Override
-            public VirtualFile getFile(String name, AuthorizationProfile auth) {
-                //TODO: implement group summaries;
-                return null;
-            }
-            @Override
-            public AbstractVirtualFolder getFolder(String folderName, AuthorizationProfile auth) {
-                if(!StringUtilities.isInteger(folderName)){return null;}
-                int id = Integer.parseInt(folderName);
-                return new VirtualGroupFolder(id, connection);
-            }
-        };
-        AbstractVirtualFolder TASKS = new AbstractVirtualFolder("tasks") {
-            @Override
-            public VirtualFile getFile(String name, AuthorizationProfile auth) {
-                //TODO: implement task summaries;
-                return null;
-            }
-            @Override
-            public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
                 if(!StringUtilities.isInteger(name)){return null;}
-                int id = Integer.parseInt(name);
-                return new VirtualTaskFolder(id, connection);
+                return new VirtualUserNode(Integer.parseInt(name), connection);}
+            @Override
+            public String getName() {return "users";}
+        };
+        AbstractVirtualNode GROUPS = new AbstractVirtualNode() {
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name));
+                return new VirtualGroupNode(Integer.parseInt(name), connection);
+            }
+            @Override public String getName() {return "null";}
+        };
+        AbstractVirtualNode TASKS = new AbstractVirtualNode() {
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name)){return null;}
+                return new VirtualTaskNode(Integer.parseInt(name), connection);
             }
 
+            @Override public String getName() {return "tasks";}
         };
-
-        ROOT.addFolder(USERS);
-        ROOT.addFolder(GROUPS);
-        ROOT.addFolder(TASKS);
-
+        ROOT_NODE = new AbstractVirtualNode() {
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                switch (name){
+                    case "users" -> {return USERS;}
+                    case "groups" -> {return GROUPS;}
+                    case "tasks" -> {return TASKS;}
+                }
+                return null;
+            }
+            @Override public String getName() {return "root";}
+        };
     }
-
     public void setConnection(Connection connection) {
         this.connection = connection;
     }
@@ -76,114 +65,66 @@ public class SpecifiedDatabaseStructure {
         }
         return INSTANCE;
     }
-
-    public VirtualFolder getROOT(){return this.ROOT;}
-    static class VirtualUserFolder extends AbstractVirtualFolder{
-        Connection connection;
-        int id;
-        static final String table = "user";
-        public VirtualUserFolder(int id, Connection connection) {
-            super(String.valueOf(id));
-            this.connection = connection;
+    public AbstractVirtualNode getROOT(){return this.ROOT_NODE;}
+    static class VirtualUserNode extends AbstractVirtualNode{
+        private Connection connection;
+        private int id;
+        private static final String table = "user";
+        public VirtualUserNode(int id, Connection connection){
             this.id = id;
+            this.connection = connection;
         }
         @Override
-        public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
-            switch (name){
-                case "id" -> {return this;}
-            }
-            return null;
-        }
-        @Override
-        public VirtualFile getFile(String name, AuthorizationProfile auth) {
+        public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
             switch(name){
-                case "id" -> {return new UserIdFile(this.id, connection);}
-                case "username" -> {return new UserUsernameFile(this.id, connection);}
-                case "group_id" -> {return new UserGroupIdFile(this.id, connection);}
-                case "task_id" -> {return new UserTaskIdFile(this.id, connection);}
+                case "id" -> {return new UserIdValueNode();}
+                case "username" -> {return new UserUsernameValueNode();}
+                case "task_id" -> {return new UserTaskIdNode();}
+                case "group_id" -> {return new UserGroupIdNode();}
             }
             return null;
         }
-        static class UserIdFile extends VirtualDatabaseFile{
-            public UserIdFile(int id, Connection connection) {
-                super(id, connection, "id");
+        @Override public String readData(AuthorizationProfile auth) {return null;} //TODO: implement user summary;
+        @Override public boolean setData(String data, AuthorizationProfile auth) {return false;}//TODO: implement creating  user;
+        @Override public boolean delete(AuthorizationProfile auth) {return false;} //TODO: implement deleting user;
+        @Override public String getName() {return String.valueOf(id);}
+        class UserIdValueNode extends VirtualSimpleValueNode{
+            public UserIdValueNode() {
+                super(connection, VirtualUserNode.this.id, "id", VirtualUserNode.table);
+            }
+            @Override
+            public String getName() {return "id";}
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                return VirtualUserNode.this.getChildNode(name, auth);
             }
 
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("id", table, id, connection), "id");
-            }
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting data;
-            }
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}
+            @Override public boolean authSet(AuthorizationProfile auth) {return false;}
+            @Override public boolean authDelete(AuthorizationProfile auth) {return false;}
         }
-        static class UserUsernameFile extends VirtualDatabaseFile{
-            public UserUsernameFile(int id, Connection connection) {
-                super(id, connection, "username");
+        class UserUsernameValueNode extends VirtualSimpleValueNode{
+            public UserUsernameValueNode() {
+                super(connection, VirtualUserNode.this.id, "username", VirtualUserNode.table);
             }
-
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}
             @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("username", table, this.id, this.connection), "username");
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting user.username
-            }
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
-        }
-        static class UserGroupIdFile extends VirtualDatabaseFile {
-
-            public UserGroupIdFile(int id, Connection connection) {
-                super(id, connection, "group_id");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                try {
-                    PreparedStatement statement = connection.prepareStatement("SELECT group_id from user_group where user_id=?");
-                    statement.setString(1, String.valueOf(this.id));
-                    ResultSet result = statement.executeQuery();
-                    if(result == null){return null;}
-                    JSONArray array = new JSONArray();
-                    while(result.next()){
-                        array.add(result.getString("group_id"));
-                    }
-                    JSONObject data = new JSONObject();
-                    data.put("group_id", array);
-                    return data.toJSONString();
-                } catch (SQLException e) {
-                    return null;
-                }
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting user.group_id;
-            }
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {
-                //TODO: implement deleting user.group_id;
-                return false;
+            public String getName() {
+                return "username";
             }
         }
-        static class UserTaskIdFile extends VirtualDatabaseFile{
-
-            public UserTaskIdFile(int id, Connection connection) {
-                super(id, connection, "task_id");
+        class UserTaskIdNode extends AbstractVirtualNode{
+            public UserTaskIdNode() {}
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name)){return null;}
+                return new UserTaskIdIdNode(Integer.parseInt(name));
             }
-
             @Override
             public String readData(AuthorizationProfile auth) {
                 try {
                     PreparedStatement statement = connection.prepareStatement("SELECT task_id, is_done FROM user_task WHERE user_id=?");
-                    statement.setString(1, String.valueOf(this.id));
+                    statement.setString(1, String.valueOf(VirtualUserNode.this.id));
                     ResultSet result = statement.executeQuery();
                     if(result == null){return null;}
                     JSONArray task_id_array = new JSONArray();
@@ -200,121 +141,162 @@ public class SpecifiedDatabaseStructure {
                     return null;
                 }
             }
+            @Override public String getName() {return "task_id";}
+            class UserTaskIdIdNode extends AbstractVirtualNode{
+                private int task_id;
+                public UserTaskIdIdNode(int task_id) {this.task_id = task_id;}
+                @Override
+                public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                    switch(name){case "is_done" -> {return new UserTaskIdIdIsDoneValueNode();}}
+                    return null;
+                }
+                @Override public String readData(AuthorizationProfile auth) {
+                    try {
+                        PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_task WHERE task_id=? AND user_id=?");
+                        statement.setInt(1, task_id);
+                        statement.setInt(2, VirtualUserNode.this.id);
+                        ResultSet result = statement.executeQuery();
+                        if(!result.next()){return null;}
+                        JSONObject data = new JSONObject();
+                        data.put("id", task_id);
+                        return data.toJSONString();
 
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting user.task_id;
-            }
+                    } catch (SQLException e) {
+                        return null;
+                    }
+                }
+                @Override public boolean setData(String data, AuthorizationProfile auth) {return false;}
+                @Override public boolean delete(AuthorizationProfile auth) {return false;} //TODO: implement deleting user.task_id.[task_id]
+                @Override public String getName() {return String.valueOf(task_id);}
+                class UserTaskIdIdIsDoneValueNode extends AbstractVirtualNode {
+                    @Override public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {return null;}
+                    @Override
+                    public String readData(AuthorizationProfile auth) {
+                        try {
+                            PreparedStatement statement = connection.prepareStatement("SELECT is_done FROM user_task WHERE user_id=? AND task_id=?");
+                            statement.setInt(1, id);
+                            statement.setInt(2, task_id);
+                            ResultSet result = statement.executeQuery();
+                            if(!result.next()){return null;}
+                            JSONObject data = new JSONObject();
+                            data.put("is_done", result.getString("is_done"));
+                            return data.toJSONString();
+                        } catch (SQLException e) {
+                            return null;
+                        }
+                    }
 
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {
-                //TODO: implement deleting user.task_id;
-                return false;
+                    @Override
+                    public boolean setData(String data, AuthorizationProfile auth) {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean delete(AuthorizationProfile auth) {
+                        return false;
+                    }
+
+                    @Override
+                    public String getName() {
+                        return null;
+                    }
+                }
             }
         }
+        class UserGroupIdNode extends AbstractVirtualNode{
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name)){return null;}
+                return new UserGroupIdIDValueNode(Integer.parseInt(name));
+            }
+            @Override public String readData(AuthorizationProfile auth) {
+                try {
+                    PreparedStatement statement = connection.prepareStatement("SELECT group_id from user_group where user_id=?");
+                    statement.setString(1, String.valueOf(id));
+                    ResultSet result = statement.executeQuery();
+                    if(result == null){return null;}
+                    JSONArray array = new JSONArray();
+                    while(result.next()){
+                        array.add(result.getString("group_id"));
+                    }
+                    JSONObject data = new JSONObject();
+                    data.put("group_id", array);
+                    return data.toJSONString();
+                } catch (SQLException e) {
+                    return null;
+                }
+            }
+            @Override public String getName() {return "group_id";}
+            class UserGroupIdIDValueNode extends AbstractVirtualNode{
+                int group_id;
+                UserGroupIdIDValueNode(int group_id){this.group_id = group_id;}
+                @Override public String readData(AuthorizationProfile auth) {
+                    try {
+                        PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_group WHERE user_id=? AND group_id=?");
+                        statement.setInt(1, VirtualUserNode.this.id);
+                        statement.setInt(2, group_id);
+                        ResultSet result = statement.executeQuery();
+                        if(!result.next()){return null;}
+                        JSONObject data = new JSONObject();
+                        data.put("id", group_id);
+                        return data.toJSONString();
 
+                    } catch (SQLException e) {
+                        return  null;
+                    }
+                }
+                @Override public String getName() {return String.valueOf(group_id);}
+            }
+        }
     }
-    static class VirtualGroupFolder extends AbstractVirtualFolder{
-        static final String table = "group_table";
+    static class VirtualGroupNode extends AbstractVirtualNode{
         int id;
         Connection connection;
-        public VirtualGroupFolder(int id, Connection connection) {
-            super(String.valueOf(id));
+        static final String table = "group_table";
+        public VirtualGroupNode(int id, Connection connection){
             this.id = id;
             this.connection = connection;
         }
-
+        @Override public String getName() {return String.valueOf(id);}
         @Override
-        public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
-            switch(name){
-                case "id" -> {return this;}
-                case "treasurer_user_id" -> {
-                    GroupTreasurerUserIdFile treasurerUserIdFile = new GroupTreasurerUserIdFile(id, connection);
-                    String treasurer_id_String = treasurerUserIdFile.readData(auth);
-                    if(treasurer_id_String == null || !StringUtilities.isInteger(treasurer_id_String)){return null;}
-                    int treasurer_id = Integer.parseInt(treasurer_id_String);
-                    return new VirtualUserFolder(treasurer_id, connection);
-                }
+        public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+            switch (name){
+                case "id" -> {return new GroupIdValueNode();}
+                case "name" -> {return new GroupNameValueNode();}
+                case "treasurer_user_id" -> {return new GroupTreasurerUserIdNode();}
+                case "user_id" -> {return new GroupUserIdNode();}
+                case "task_id" -> {return new GroupTaskIdNode();}
             }
             return null;
         }
-
-        @Override
-        public VirtualFile getFile(String name, AuthorizationProfile auth) {
-            switch(name){
-                case "id" -> {return new GroupIdFile(this.id, connection);}
-                case "name" -> {return new GroupNameFile(this.id, connection);}
-                case "treasurer_user_id" -> {return new GroupTreasurerUserIdFile(this.id, connection);}
-                case "user_id" -> {return new GroupUserIdFile(this.id, connection);}
-                case "task_id" -> {return new GroupTaskIdFile(this.id, connection);}
+        class GroupIdValueNode extends VirtualSimpleValueNode{
+            public GroupIdValueNode() {
+                super(connection, VirtualGroupNode.this.id, "id", VirtualGroupNode.table);
             }
-            return null;
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                return VirtualGroupNode.this.getChildNode(name, auth);
+            }
+            @Override
+            public String getName() {return "id";}
+            @Override
+            public boolean authRead(AuthorizationProfile auth) {return true;}
         }
-
-        static class GroupIdFile extends VirtualDatabaseFile{
-
-            public GroupIdFile(int id, Connection connection) {
-                super(id, connection, "id");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("id", table, this.id, this.connection), "id");
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {}
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+        class GroupNameValueNode extends VirtualSimpleValueNode{
+            public GroupNameValueNode() {super(connection, VirtualGroupNode.this.id, "name", VirtualGroupNode.table);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}
         }
-        static class GroupNameFile extends VirtualDatabaseFile {
-
-            public GroupNameFile(int id, Connection connection) {
-                super(id, connection, "name");
-            }
-
+        class GroupTreasurerUserIdNode extends VirtualSimpleValueNode{
             @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("name", table, this.id, this.connection), "name");
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                String treasurerIdString = DatabaseUtilities.queryString("treasurer_user_id", table, id, connection);
+                if(treasurerIdString == null){return null;}
+                return new VirtualUserNode(Integer.parseInt(treasurerIdString), connection);
             }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting group.name;
-            }
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+            public GroupTreasurerUserIdNode() {super(connection, VirtualGroupNode.this.id, "treasurer_user_id", VirtualGroupNode.table);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}
         }
-        static class GroupTreasurerUserIdFile extends VirtualDatabaseFile{
-
-            public GroupTreasurerUserIdFile(int id, Connection connection) {
-                super(id, connection, "treasurer_user_id");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("treasurer_user_id", table, this.id, this.connection), "treasurer_user_id");
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting group.treasurer_user_id;
-            }
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {
-                //TODO: implement deleting group.treasurer_user_id;
-                return false;
-            }
-        }
-        static class GroupUserIdFile extends VirtualDatabaseFile {
-
-            public GroupUserIdFile(int id, Connection connection) {
-                super(id, connection, "user_id");
-            }
-
+        class GroupUserIdNode extends AbstractVirtualNode{
             @Override
             public String readData(AuthorizationProfile auth) {
                 try {
@@ -333,29 +315,43 @@ public class SpecifiedDatabaseStructure {
                     return null;
                 }
             }
+            @Override public String getName() {return "user_id";}
 
             @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting group.user_id;
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name)){return null;}
+                return new GroupUserIdIdNode(Integer.parseInt(name));
             }
 
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {
-                //TODO: implement deleting group.user_id;
-                return false;
+            class GroupUserIdIdNode extends AbstractVirtualNode{
+                int user_id;
+                public GroupUserIdIdNode(int user_id){this.user_id = user_id;}
+                @Override public String readData(AuthorizationProfile auth) {
+                    try {
+                        PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_group WHERE user_id=? AND group_id=?");
+                        statement.setInt(1, user_id);
+                        statement.setInt(2, id);
+                        ResultSet result = statement.executeQuery();
+                        if(!result.next()){return null;}
+                        JSONObject data = new JSONObject();
+                        data.put("user_id", user_id);
+                        return data.toJSONString();
+
+                    } catch (SQLException e) {
+                        return null;
+                    }
+
+                }
+                @Override public boolean delete(AuthorizationProfile auth) {return false;} //TODO: implement deleting group.user_id;
+                @Override public String getName() {return String.valueOf(user_id);}
             }
         }
-        static class GroupTaskIdFile extends VirtualDatabaseFile {
-
-            public GroupTaskIdFile(int id, Connection connection) {
-                super(id, connection, "task_id");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
+        class GroupTaskIdNode extends AbstractVirtualNode{
+            @Override public String getName() {return "task_id";}
+            @Override public String readData(AuthorizationProfile auth) {
                 try {
                     PreparedStatement statement = connection.prepareStatement("SELECT id FROM task WHERE group_id=?");
-                    statement.setString(1, String.valueOf(this.id));
+                    statement.setString(1, String.valueOf(id));
                     ResultSet result = statement.executeQuery();
                     if(result == null){return null;}
                     JSONArray array = new JSONArray();
@@ -370,183 +366,109 @@ public class SpecifiedDatabaseStructure {
                     return null;
                 }
             }
-
             @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting group.task_id;
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name)){return null;}
+                return new GroupTaskIdIdNode(Integer.parseInt(name));}
+            class GroupTaskIdIdNode extends AbstractVirtualNode{
+                int task_id;
+                public GroupTaskIdIdNode(int task_id){this.task_id = task_id;}
+                @Override public String getName() {return String.valueOf(task_id);}
+                @Override
+                public String readData(AuthorizationProfile auth) {
+                    try {
+                        PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM task WHERE task.id=? AND task.group_id=?");
+                        statement.setInt(1, task_id);
+                        statement.setInt(2, id);
+                        ResultSet result = statement.executeQuery();
+                        if(!result.next()){return null;}
+                        JSONObject data = new JSONObject();
+                        data.put("task_id", task_id);
+                        return data.toJSONString();
+
+                    } catch (SQLException e) {
+                        return null;
+                    }
+                }
             }
 
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {
-                //TODO: implement deleting group.tasl_id
-                return false;
-            }
         }
-
     }
-    static class VirtualTaskFolder extends AbstractVirtualFolder{
-        static final String table = "task";
-        Connection connection;
+    static class VirtualTaskNode extends AbstractVirtualNode{
         int id;
-        public VirtualTaskFolder(int id, Connection connection) {
-            super(String.valueOf(id));
+        Connection connection;
+        static final String table = "task";
+        public VirtualTaskNode(int id, Connection connection){
             this.id = id;
             this.connection = connection;
         }
-
         @Override
-        public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
-            switch (name){
-                case "id" -> {return this;}
-                case "group_id" -> {
-                    TaskGroupIdFile groupIdFile = new TaskGroupIdFile(this.id, connection);
-                    String groupIdString = groupIdFile.readData(auth);
-                    if(groupIdString == null || !StringUtilities.isInteger(groupIdString)){return null;}
-                    int group_id = Integer.parseInt(groupIdString);
-                    return new VirtualGroupFolder(group_id, connection);
-                }
+        public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+            switch(name){
+                case "id" -> {return new TaskIdVirtualNode();}
+                case "type" -> {return new TaskTypeVirtualValueNode();}
+                case "due_timestamp" -> {return new TaskDueTimeStampValueNode();}
+                case "description" -> {return new TaskDescriptionValueNode();}
+                case "group_id" -> {return new TaskGroupIdValueNode();}
+                case "amount" -> {return new TaskAmountValueNode();}
+                case "user_id" -> {return new TaskUserIdNode();}
             }
             return null;
         }
-
-        @Override
-        public VirtualFile getFile(String name, AuthorizationProfile auth) {
-            switch (name){
-                case "id" -> {return new TaskIdFile(id, connection);}
-                case "type" -> {return new TaskTypeFile(id, connection);}
-                case "due_timestamp" -> {return new TaskDueTimestampFile(id, connection);}
-                case "description" -> {return new TaskDescriptionFile(id, connection);}
-                case "group_id" -> {return new TaskGroupIdFile(id, connection);}
-                case "amount" -> {return  new TaskAmountFile(id, connection);}
-                case "user_id" -> {return new TaskUserIdFile(id, connection);}
-            }
-            return null;
+        @Override public String getName() {return String.valueOf(id);}
+        class TaskIdVirtualNode extends VirtualSimpleValueNode{
+            @Override
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {return VirtualTaskNode .this.getChildNode(name, auth);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
+            public TaskIdVirtualNode() {super(connection, VirtualTaskNode.this.id, "id", VirtualTaskNode.table);}
         }
-
-        static class TaskIdFile extends VirtualDatabaseFile {
-            public TaskIdFile(int id, Connection connection) {
-                super(id, connection, "id");
-            }
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("id", table, this.id, this.connection), "id");
-            }
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {}
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+        class TaskTypeVirtualValueNode extends VirtualSimpleValueNode{
+            public TaskTypeVirtualValueNode() {super(connection, VirtualTaskNode.this.id, "type", VirtualTaskNode.table);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
         }
-        static class TaskTypeFile extends VirtualDatabaseFile {
-
-            public TaskTypeFile(int id, Connection connection) {
-                super(id, connection, "type");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("type", table, this.id, this.connection), "type");
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting task.type;
-            }
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+        class TaskDueTimeStampValueNode extends VirtualSimpleValueNode{
+            public TaskDueTimeStampValueNode() {super(connection, VirtualTaskNode.this.id,"due_timestamp", VirtualTaskNode.table);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
         }
-        static class TaskDueTimestampFile extends VirtualDatabaseFile{
-            public TaskDueTimestampFile(int id, Connection connection) {
-                super(id, connection, "due_timestamp");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("due_timestamp", table, this.id, this.connection), "due_timestamp");
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting task.due_timestamp;
-            }
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+        class TaskDescriptionValueNode extends VirtualSimpleValueNode{
+            public TaskDescriptionValueNode() {super(connection, VirtualTaskNode.this.id, "description", VirtualTaskNode.table);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
         }
-        static class TaskDescriptionFile extends VirtualDatabaseFile{
-            public TaskDescriptionFile(int id, Connection connection) {
-                super(id, connection, "description");
-            }
-
+        class TaskGroupIdValueNode extends VirtualSimpleValueNode{
+            public TaskGroupIdValueNode() {super(connection, VirtualTaskNode.this.id, "group_id", VirtualTaskNode.table);}
+            @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
             @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("description", table, this.id, this.connection), "description");
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                String groupIdString = DatabaseUtilities.queryString("group_id", table, id, connection);
+                if(groupIdString == null){return null;}
+                return new VirtualGroupNode(Integer.parseInt(groupIdString), connection).getChildNode(name, auth);
             }
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting task.description;
-            }
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
         }
-        static class TaskGroupIdFile extends VirtualDatabaseFile{
-
-            public TaskGroupIdFile(int id, Connection connection) {
-                super(id, connection, "group_id");
-            }
-
-            @Override
-            public String readData(AuthorizationProfile auth) {
-                return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString("group_id", table, this.id, this.connection), "group_id");
-            }
-
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting task.group_id;
-            }
-
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
-        }
-        static class TaskAmountFile extends VirtualDatabaseFile{
-            public TaskAmountFile(int id, Connection connection) {
-                super(id, connection, "amount");
-            }
-
+        class TaskAmountValueNode extends AbstractVirtualNode{
             @Override
             public String readData(AuthorizationProfile auth) {
                 try {
                     PreparedStatement statement = connection.prepareStatement("SELECT amount FROM payment_task WHERE parent_id=?");
-                    statement.setString(1, String.valueOf(this.id));
+                    statement.setInt(1, id);
                     ResultSet result = statement.executeQuery();
-                    if(result == null){return null;}
                     if(!result.next()){return null;}
                     JSONObject data = new JSONObject();
                     data.put("amount", result.getString("amount"));
                     return data.toJSONString();
+
                 } catch (SQLException e) {
                     return null;
                 }
             }
 
-            @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting task.amount;
-            }
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {return false;}
+            @Override public String getName() {return "amount";}
         }
-        static class TaskUserIdFile extends VirtualDatabaseFile {
-
-            public TaskUserIdFile(int id, Connection connection) {
-                super(id, connection, "user_id");
-            }
-
+        class TaskUserIdNode extends  AbstractVirtualNode{
             @Override
             public String readData(AuthorizationProfile auth) {
                 try {
                     PreparedStatement statement = connection.prepareStatement("SELECT user_id, is_done FROM user_task WHERE task_id=?;");
-                    statement.setString(1, String.valueOf(this.id));
+                    statement.setString(1, String.valueOf(id));
                     ResultSet result = statement.executeQuery();
                     if(result == null){return null;}
                     JSONArray user_id = new JSONArray();
@@ -563,17 +485,62 @@ public class SpecifiedDatabaseStructure {
                     return null;
                 }
             }
+            @Override public String getName() {return "user_Id";}
 
             @Override
-            public void setData(String data, AuthorizationProfile auth) {
-                //TODO: implement setting task.user_id;
+            public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(!StringUtilities.isInteger(name)){return null;}
+                return new TaskUserIdIdNode(Integer.parseInt(name));
             }
+            class TaskUserIdIdNode extends AbstractVirtualNode{
+                int user_id;
+                public TaskUserIdIdNode(int task_id){this.user_id = task_id;}
+                @Override public String readData(AuthorizationProfile auth) {
+                    try {
+                        PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_task WHERE user_id=? AND task_id=?");
+                        statement.setInt(1, user_id);
+                        statement.setInt(2, id);
+                        ResultSet result = statement.executeQuery();
+                        if(!result.next()){return null;}
+                        JSONObject data = new JSONObject();
+                        data.put("user_id", user_id);
+                        return data.toJSONString();
 
-            @Override
-            public boolean deleteData(AuthorizationProfile auth) {
-                //TODO: implement deleting task.user_id;
-                return false;
+                    } catch (SQLException e) {
+                        return null;
+                    }
+                }
+                @Override public String getName() {return String.valueOf(user_id);}
+
+                @Override
+                public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                    switch (name){
+                        case "is_done" -> {return new TaskUserIdIdIsDoneNode();}
+                    }
+                    return null;
+                }
+
+                class TaskUserIdIdIsDoneNode extends AbstractVirtualNode{
+                    @Override
+                    public String readData(AuthorizationProfile auth) {
+                        try {
+                            PreparedStatement statement = connection.prepareStatement("SELECT is_done FROM user_task WHERE user_id=? AND task_id=?");
+                            statement.setInt(1, user_id);
+                            statement.setInt(2, id);
+                            ResultSet result = statement.executeQuery();
+                            if(!result.next()){return null;}
+                            JSONObject data = new JSONObject();
+                            data.put("is_done", result.getString("is_done"));
+                            return data.toJSONString();
+                        } catch (SQLException e) {
+                            return null;
+                        }
+                    }
+
+                    @Override public String getName() {return "is_done";}
+                }
             }
         }
+
     }
 }
