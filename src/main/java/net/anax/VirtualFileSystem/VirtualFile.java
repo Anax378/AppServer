@@ -5,9 +5,8 @@ public abstract class VirtualFile {
     public VirtualFile(String name){
         this.name = name;
     }
-
     public String getName() {
         return name;
     }
-    abstract public String readData();
+    abstract public String readData(AuthorizationProfile auth);
 }

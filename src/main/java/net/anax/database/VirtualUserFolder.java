@@ -36,7 +36,7 @@ public class VirtualUserFolder extends AbstractVirtualFolder {
         final String finalData = data;
         return new VirtualFile(name) {
             @Override
-            public String readData() {
+            public String readData(AuthorizationProfile auth) {
                 return finalData;
             }
         };

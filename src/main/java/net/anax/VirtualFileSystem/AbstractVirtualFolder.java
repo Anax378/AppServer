@@ -1,5 +1,7 @@
 package net.anax.VirtualFileSystem;
 
+import net.anax.logging.Logger;
+
 public abstract class AbstractVirtualFolder {
     String name;
 
@@ -12,7 +14,9 @@ public abstract class AbstractVirtualFolder {
     }
 
     public VirtualFile getFileFromPATH(VirtualPathNode node, AuthorizationProfile auth){
-        if(node == null){return null;}
+        if(node == null){
+            return null;
+        }
         if(node.next == null){
             return this.getFile(node.data, auth);
         }

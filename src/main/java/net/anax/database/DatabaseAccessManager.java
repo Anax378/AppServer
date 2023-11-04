@@ -2,87 +2,59 @@ package net.anax.database;
 
 import net.anax.VirtualFileSystem.*;
 import net.anax.logging.Logger;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.*;
 
 public class DatabaseAccessManager {
     private static DatabaseAccessManager instance;
+    private VirtualFolder ROOT_FOLDER;
 
-    private final VirtualFolder ROOT_FOLDER = new VirtualFolder("root");
+    private SpecifiedDatabaseStructure specificDatabase = null;
+
     Connection connection;
+
+    String database_username;
+    String database_password;
+    String database_address;
 
     public DatabaseAccessManager(){
         try {
+            JSONObject config = (JSONObject) new JSONParser().parse(new FileReader("config.json"));
+            database_username = (String) config.get("database_username");
+            database_address = (String) config.get("database_address");
+            database_password = (String) config.get("database_password");
+        } catch (FileNotFoundException e) {
+            Logger.log("Could not find config file");
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            Logger.log("Cannot read config ");
+            throw new RuntimeException(e);
+        } catch (ParseException e) {
+            Logger.log("Could not parse config file");
+        }
+
+        try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");
+            connection = DriverManager.getConnection("jdbc:mysql://" + database_address + "/schoolapp", database_username, database_password);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        AbstractVirtualFolder USERS = new AbstractVirtualFolder("users") {
-            @Override
-            public AbstractVirtualFolder getFolder(String name, AuthorizationProfile auth) {
-                try{
-                    if(connection.isClosed()){connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");}
-                    int user_id = Integer.parseInt(name);
-                    PreparedStatement statement = connection.prepareStatement("SELECT * FROM user WHERE id = ?");
-                    statement.setString(1, ""+user_id);
-                    ResultSet result = statement.executeQuery();
-                    if(result.next()){
-                        return new VirtualUserFolder(name, connection);
-                    }
-                    Logger.log("no result for the user id " + user_id);
-                    return null;
-                }catch(NumberFormatException e){
-                    Logger.log("invalid username for " + name);
-                    return null;
-                } catch (SQLException e) {
-                    Logger.log("sdl exception for " + name);
-                    e.printStackTrace();
-                    return null;
-                }
 
-            }
-
-            @Override
-            public VirtualFile getFile(String name,  AuthorizationProfile auth) {
-                return null;
-            }
-        };
-        AbstractVirtualFolder CLASSES = new AbstractVirtualFolder("classes") {
-            @Override
-            public AbstractVirtualFolder getFolder(String name,  AuthorizationProfile auth) {
-                try {
-                    if(connection.isClosed()){connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "java", "password");}
-                    int class_id = Integer.parseInt(name);
-                    PreparedStatement statement = connection.prepareStatement("SELECT * FROM class WHERE class.id = ?");
-                    statement.setString(1, ""+class_id);
-                    ResultSet result = statement.executeQuery();
-                    if(result.next()){
-                        return new VirtualClassFolder(""+class_id, connection);
-                    }
-                    return null;
-
-                } catch (SQLException e) {
-                    Logger.log("SQL exception for the name " + name);
-                    return null;
-                } catch (NumberFormatException e){
-                    Logger.log("invalid number format for " + name);
-                    return null;
-                }
-            }
-
-            @Override
-            public VirtualFile getFile(String name, AuthorizationProfile auth) {
-                return null;
-            }
-        };
-
-        ROOT_FOLDER.addFolder(USERS);
-        ROOT_FOLDER.addFolder(CLASSES);
+        specificDatabase = SpecifiedDatabaseStructure.getINSTANCE();
+        specificDatabase.setConnection(connection);
+        ROOT_FOLDER = specificDatabase.getROOT();
 
     }
+
+
     public static DatabaseAccessManager getInstance(){
         if(instance == null) {
             instance = new DatabaseAccessManager();
@@ -103,7 +75,7 @@ public class DatabaseAccessManager {
         }
         VirtualFile file = ROOT_FOLDER.getFileFromPATH(lastNode, auth);
         if(file != null){
-            return file.readData();
+            return file.readData(auth);
         }
         System.out.println("404 not found: " + URI);
         return null;

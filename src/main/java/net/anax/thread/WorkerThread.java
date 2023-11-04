@@ -47,9 +47,9 @@ public class WorkerThread extends Thread{
                 HTTPRequest request = parser.parseRequest(inputStream);
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
-                //TODO: handle request
+                //handle request
+                String body = DatabaseAccessManager.getInstance().getDataFromURI(request.getURI(), new UserAuthorizationProfile("test", -1){@Override public boolean isAdmin() {return true;}});
 
-                String body = DatabaseAccessManager.getInstance().getDataFromURI(request.getURI(), new UserAuthorizationProfile(""));
                 if(body == null){
                     response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
                     response.setBody("404 not found<br>currently implemented file system schema:<br><img src=\"http://media.discordapp.net/attachments/1158003459073785896/1158075668958031882/IMPLEMENTED_FILE_STRUCUTRE.drawio.png?ex=651aed83&is=65199c03&hm=4597daf7ad29b28c2c93b3754df489f8ebca21d2fbe6ee5957ee387ef841922d&=&width=672&height=577\">");

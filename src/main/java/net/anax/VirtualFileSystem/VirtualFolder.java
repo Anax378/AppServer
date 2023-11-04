@@ -23,6 +23,7 @@ public class VirtualFolder extends AbstractVirtualFolder{
         if(folders.containsKey(folderName)){
             return folders.get(folderName);
         }
+        System.out.println("no folder " + folderName + " in " + this.name);
         return null;
     }
 

@@ -1,3 +1,6 @@
 {
-  "port": 8080
+  "port": 8080,
+  "database_address": "localhost:3306",
+  "database_username": "schoolapp_java",
+  "database_password": "java_password"
 }
