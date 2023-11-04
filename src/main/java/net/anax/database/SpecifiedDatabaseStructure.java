@@ -1,7 +1,6 @@
 package net.anax.database;
 
 import net.anax.VirtualFileSystem.*;
-import net.anax.logging.Logger;
 import net.anax.util.DatabaseUtilities;
 import net.anax.util.StringUtilities;
 import org.json.simple.JSONArray;
@@ -66,6 +65,7 @@ public class SpecifiedDatabaseStructure {
         return INSTANCE;
     }
     public AbstractVirtualNode getROOT(){return this.ROOT_NODE;}
+
     static class VirtualUserNode extends AbstractVirtualNode{
         private Connection connection;
         private int id;
@@ -76,6 +76,7 @@ public class SpecifiedDatabaseStructure {
         }
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+            if(auth.getId() != id && !auth.isAdmin() && !Authorization.sharesGroupWith(auth, id, connection)){return null;}
             switch(name){
                 case "id" -> {return new UserIdValueNode();}
                 case "username" -> {return new UserUsernameValueNode();}
@@ -117,11 +118,13 @@ public class SpecifiedDatabaseStructure {
             public UserTaskIdNode() {}
             @Override
             public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(auth.getId() != id && !auth.isAdmin()){return null;}
                 if(!StringUtilities.isInteger(name)){return null;}
                 return new UserTaskIdIdNode(Integer.parseInt(name));
             }
             @Override
             public String readData(AuthorizationProfile auth) {
+                if(auth.getId() != id && !auth.isAdmin()){return null;}
                 try {
                     PreparedStatement statement = connection.prepareStatement("SELECT task_id, is_done FROM user_task WHERE user_id=?");
                     statement.setString(1, String.valueOf(VirtualUserNode.this.id));
@@ -206,10 +209,12 @@ public class SpecifiedDatabaseStructure {
         class UserGroupIdNode extends AbstractVirtualNode{
             @Override
             public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+                if(auth.getId() != id && !auth.isAdmin()){return null;}
                 if(!StringUtilities.isInteger(name)){return null;}
                 return new UserGroupIdIDValueNode(Integer.parseInt(name));
             }
             @Override public String readData(AuthorizationProfile auth) {
+                if(auth.getId() != id && !auth.isAdmin()){return null;}
                 try {
                     PreparedStatement statement = connection.prepareStatement("SELECT group_id from user_group where user_id=?");
                     statement.setString(1, String.valueOf(id));
@@ -260,6 +265,7 @@ public class SpecifiedDatabaseStructure {
         @Override public String getName() {return String.valueOf(id);}
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+            if(!auth.isAdmin() && !Authorization.isMemberOfGroup(auth, id, connection))
             switch (name){
                 case "id" -> {return new GroupIdValueNode();}
                 case "name" -> {return new GroupNameValueNode();}
@@ -289,6 +295,7 @@ public class SpecifiedDatabaseStructure {
         class GroupTreasurerUserIdNode extends VirtualSimpleValueNode{
             @Override
             public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+
                 String treasurerIdString = DatabaseUtilities.queryString("treasurer_user_id", table, id, connection);
                 if(treasurerIdString == null){return null;}
                 return new VirtualUserNode(Integer.parseInt(treasurerIdString), connection);
@@ -404,6 +411,7 @@ public class SpecifiedDatabaseStructure {
         }
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
+            if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id, connection)){return null;}
             switch(name){
                 case "id" -> {return new TaskIdVirtualNode();}
                 case "type" -> {return new TaskTypeVirtualValueNode();}

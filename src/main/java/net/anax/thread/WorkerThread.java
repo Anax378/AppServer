@@ -48,7 +48,7 @@ public class WorkerThread extends Thread{
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
                 //handle request
-                String body = DatabaseAccessManager.getInstance().getDataFromURI(request.getURI(), new UserAuthorizationProfile("test", -1){@Override public boolean isAdmin() {return true;}});
+                String body = DatabaseAccessManager.getInstance().getDataFromURI(request.getURI(), new UserAuthorizationProfile(-1){@Override public boolean isAdmin() {return true;}});
 
                 if(body == null){
                     response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
