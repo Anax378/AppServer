@@ -102,13 +102,15 @@ public class SpecifiedDatabaseStructure {
 
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}
             @Override public boolean authSet(AuthorizationProfile auth) {return false;}
-            @Override public boolean authDelete(AuthorizationProfile auth) {return false;}
         }
         class UserUsernameValueNode extends VirtualSimpleValueNode{
             public UserUsernameValueNode() {
                 super(connection, VirtualUserNode.this.id, "username", VirtualUserNode.table);
             }
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}
+            @Override
+            public boolean authSet(AuthorizationProfile auth) {return auth.isAdmin() || auth.getId() == id;}
+
             @Override
             public String getName() {
                 return "username";
@@ -191,14 +193,8 @@ public class SpecifiedDatabaseStructure {
 
                     @Override
                     public boolean setData(String data, AuthorizationProfile auth) {
-                        return false;
+                        return auth.isAdmin() || auth.getId() == id;
                     }
-
-                    @Override
-                    public boolean delete(AuthorizationProfile auth) {
-                        return false;
-                    }
-
                     @Override
                     public String getName() {
                         return null;
@@ -265,13 +261,14 @@ public class SpecifiedDatabaseStructure {
         @Override public String getName() {return String.valueOf(id);}
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
-            if(!auth.isAdmin() && !Authorization.isMemberOfGroup(auth, id, connection))
+            if(!auth.isAdmin() && !Authorization.isMemberOfGroup(auth, id, connection)){return null;}
             switch (name){
                 case "id" -> {return new GroupIdValueNode();}
                 case "name" -> {return new GroupNameValueNode();}
                 case "treasurer_user_id" -> {return new GroupTreasurerUserIdNode();}
                 case "user_id" -> {return new GroupUserIdNode();}
                 case "task_id" -> {return new GroupTaskIdNode();}
+                case "admin_id" -> {return new GroupAdminIdValueNode();}
             }
             return null;
         }
@@ -399,6 +396,13 @@ public class SpecifiedDatabaseStructure {
                 }
             }
 
+        }
+        class GroupAdminIdValueNode extends VirtualSimpleValueNode{
+            public GroupAdminIdValueNode() {
+                super(connection, VirtualGroupNode.this.id, "admin_id", VirtualGroupNode.table);
+            }
+            @Override
+            public boolean authRead(AuthorizationProfile auth) {return true;}
         }
     }
     static class VirtualTaskNode extends AbstractVirtualNode{

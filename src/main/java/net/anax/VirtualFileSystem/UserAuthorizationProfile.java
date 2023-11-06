@@ -9,7 +9,6 @@ public class UserAuthorizationProfile extends AuthorizationProfile{
     public boolean isAdmin() {
         return false;
     }
-
     @Override
     public int getId() {
         return id;

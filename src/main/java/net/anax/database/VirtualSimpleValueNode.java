@@ -5,8 +5,13 @@ import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.logging.Logger;
 import net.anax.util.DatabaseUtilities;
 import net.anax.util.StringUtilities;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
 public abstract class VirtualSimpleValueNode extends AbstractVirtualNode {
     private Connection connection;
@@ -31,8 +36,21 @@ public abstract class VirtualSimpleValueNode extends AbstractVirtualNode {
     @Override
     public boolean setData(String data, AuthorizationProfile auth) {
         if(!authSet(auth)){return false;}
-        //TODO: implement setting simple data;
-        return false;
+        try {
+            JSONParser parser = new JSONParser();
+            JSONObject jsonData = (JSONObject) parser.parse(data);
+            String newData = (String)jsonData.get(field);
+            if(newData == null || newData.isEmpty()){return false;}
+            PreparedStatement statement = connection.prepareStatement("UPDATE " + table + " SET " + field + " =? WHERE id=?");
+            statement.setString(1, newData);
+            statement.setInt(2, id);
+            statement.executeQuery();
+            return true;
+        } catch (SQLException e) {
+            return false;
+        } catch (ParseException e) {
+            return false;
+        }
     }
 
     @Override
