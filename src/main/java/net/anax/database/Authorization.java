@@ -41,4 +41,16 @@ public class Authorization {
             return false;
         }
     };
+
+    public static boolean isAdminInGroup(AuthorizationProfile auth, int group_id, Connection connection){
+        try {
+            PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM group_table WHERE id=? AND admin_id=?");
+            statement.setInt(1, group_id);
+            statement.setInt(2, auth.getId());
+            return statement.executeQuery().next();
+        } catch (SQLException e) {
+            return false;
+        }
+
+    }
 }

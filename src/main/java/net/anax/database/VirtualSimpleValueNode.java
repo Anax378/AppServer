@@ -35,20 +35,24 @@ public abstract class VirtualSimpleValueNode extends AbstractVirtualNode {
 
     @Override
     public boolean setData(String data, AuthorizationProfile auth) {
-        if(!authSet(auth)){return false;}
         try {
+            if(!authSet(auth)){return false;}
             JSONParser parser = new JSONParser();
             JSONObject jsonData = (JSONObject) parser.parse(data);
-            String newData = (String)jsonData.get(field);
-            if(newData == null || newData.isEmpty()){return false;}
+
+            if(!jsonData.containsKey(field)){return false;}
+
+            Object newData = jsonData.get(field);
+            if(!(newData instanceof String)){return false;}
+            if(((String)newData).isEmpty()){return false;}
+
             PreparedStatement statement = connection.prepareStatement("UPDATE " + table + " SET " + field + " =? WHERE id=?");
-            statement.setString(1, newData);
+
+            statement.setString(1, (String) newData);
             statement.setInt(2, id);
             statement.executeQuery();
             return true;
-        } catch (SQLException e) {
-            return false;
-        } catch (ParseException e) {
+        } catch (SQLException | ParseException e) {
             return false;
         }
     }
