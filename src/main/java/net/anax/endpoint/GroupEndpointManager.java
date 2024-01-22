@@ -1,0 +1,172 @@
+package net.anax.endpoint;
+
+import net.anax.VirtualFileSystem.AuthorizationProfile;
+import net.anax.database.Authorization;
+import net.anax.util.DatabaseUtilities;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class GroupEndpointManager {
+    Connection connection;
+    public GroupEndpointManager(Connection connection){
+        this.connection = connection;
+    }
+
+    public String getGroup(int groupId, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!Authorization.isMemberOfGroup(auth, groupId, connection) || auth.isAdmin()){
+            throw new EndpointFailedException("Access Denoed", EndpointFailedException.Reason.AccessDenied);
+        }
+
+        String name = DatabaseUtilities.queryString("name", "group_table", groupId, connection);
+        String treasurerUserId = DatabaseUtilities.queryString("treasurer_user_id", "group_table", groupId, connection);
+        String adminUserId = DatabaseUtilities.queryString("admin_id", "group_table", groupId, connection);
+        if(name == null || treasurerUserId == null || adminUserId == null){throw new EndpointFailedException("data not found", EndpointFailedException.Reason.DataNotFound);}
+
+        try {
+            PreparedStatement statement = connection.prepareStatement("SELECT user_id FROM user_group WHERE group_id=?");
+            statement.setInt(1, groupId);
+            ResultSet result = statement.executeQuery();
+            JSONArray userIds = new JSONArray();
+            while(result.next()){
+                userIds.add(result.getInt("user_id"));
+            }
+
+            PreparedStatement taskStatement = connection.prepareStatement("SELECT id FROM task WHERE group_id=?");
+            taskStatement.setInt(1, groupId);
+            ResultSet taskResult = taskStatement.executeQuery();
+            JSONArray taskIds = new JSONArray();
+            while(taskResult.next()){
+                taskIds.add(taskResult.getInt("id"));
+            }
+            JSONObject data = new JSONObject();
+            data.put("name", name);
+            data.put("treasurerUserId", treasurerUserId);
+            data.put("userIds", userIds);
+            data.put("taskIds", taskIds);
+
+            return data.toJSONString();
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        }
+
+    }
+
+    public String setName(int groupId, String newName, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && !Authorization.isAdminInGroup(auth, groupId, connection)){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+
+        try {
+
+            PreparedStatement statement = connection.prepareStatement("UPDATE group_table SET name=? WHERE id=?");
+            statement.setString(1, newName);
+            statement.setInt(2, groupId);
+            int affected = statement.executeUpdate();
+            if(affected == 0){throw new EndpointFailedException("nothing changed when chaning group name", EndpointFailedException.Reason.NothingChanged);}
+            return "{\"success\":true}";
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public String setTreasurerUserId(int groupId, int newTreasurerUserId, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && !Authorization.isAdminInGroup(auth, groupId, connection)){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);};
+        try {
+            PreparedStatement statement = connection.prepareStatement("UPDATE group_table SET treasurer_user_id=? WHERE id=?");
+            statement.setInt(1, newTreasurerUserId);
+            statement.setInt(2, groupId);
+            int affected = statement.executeUpdate();
+            if(affected == 0){throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);}
+            return "{\"success\":true}";
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        }
+    }
+
+    public String setAdminUserId(int groupId, int newAdminUserID, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && !Authorization.isAdminInGroup(auth, groupId, connection)){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+        try {
+            PreparedStatement statement = connection.prepareStatement("UPDATE group_table SET admin_id=? WHERE id=?");
+            statement.setInt(1, newAdminUserID);
+            statement.setInt(2, groupId);
+            int affected = statement.executeUpdate();
+            if(affected == 0){throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);}
+            return "{\"success\":true}";
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        }
+    }
+
+    public String setIsInGroup(int groupId, int userId, boolean isInGroup, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && !(isInGroup ? Authorization.isMemberOfGroup(auth, groupId, connection) : (Authorization.isAdminInGroup(auth, groupId, connection) || auth.getId() == userId))){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+        try{
+            if(isInGroup){
+                PreparedStatement statement = connection.prepareStatement("INSERT INTO user_group (user_id, group_id) VALUES (?, ?);");
+                statement.setInt(1, userId);
+                statement.setInt(2, groupId);
+                int affected = statement.executeUpdate();
+                if(affected == 0){throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);}
+                return "{\"success\":true}";
+            }else{
+                PreparedStatement statement = connection.prepareStatement("DELETE FROM user_group WHERE (user_id=? AND group_id=?)");
+                statement.setInt(1, userId);
+                statement.setInt(2, groupId);
+                int affected = statement.executeUpdate();
+                if(affected == 0){throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);}
+                return "{\"success\":true}";
+            }
+        }catch(SQLException e){
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        }
+    }
+
+
+    public String createGroup(String name, int authorUserId, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && auth.getId() != authorUserId){throw new EndpointFailedException("Access Denied",EndpointFailedException.Reason.AccessDenied);}
+        try {
+            PreparedStatement statement = connection.prepareStatement("INSERT INTO group_table (name, admin_id) VALUES (?, ?);");
+            statement.setString(1, name);
+            statement.setInt(2, authorUserId);
+            statement.executeUpdate();
+            ResultSet result = statement.getGeneratedKeys();
+            if(!result.next()){throw new EndpointFailedException("no keys generated, unable to create group", EndpointFailedException.Reason.UnexpectedError);}
+            int id = result.getInt(1);
+
+            PreparedStatement add_user_statement = connection.prepareStatement("INSERT INTO user_group (user_id, group_id) VALUES (?, ?);");
+            add_user_statement.setInt(1, authorUserId);
+            add_user_statement.setInt(2, id);
+            int affected = add_user_statement.executeUpdate();
+            if(affected == 0){throw new EndpointFailedException("no user added to newly generated group", EndpointFailedException.Reason.UnexpectedError);}
+
+            JSONObject data = new JSONObject();
+            data.put("id", id);
+            return data.toJSONString();
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        }
+    }
+
+    public String removeTreasurer(int groupId, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && !Authorization.isAdminInGroup(auth, groupId, connection)){
+            throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
+        }
+
+        try {
+            PreparedStatement statement = connection.prepareStatement("UPDATE group_table SET treasurer_user_id=NULL WHERE id=?");
+            statement.setInt(1, groupId);
+            int affected = statement.executeUpdate();
+            if(affected == 0){throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);}
+            return "{\"success\":true}";
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        }
+    }
+
+}
