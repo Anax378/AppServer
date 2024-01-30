@@ -41,7 +41,7 @@ public class Main {
         port = ((Long)config.get("port")).intValue();
         try {
             ServerSocket serverSocket = new ServerSocket(port);
-            ListenerThread listenerThread = new ListenerThread(serverSocket);
+            ListenerThread listenerThread = new ListenerThread(serverSocket, keyManager);
             listenerThread.start();
             System.out.println("Server started at port " + port);
 
@@ -51,7 +51,4 @@ public class Main {
 
     }
 
-    public static KeyManager getKeyManager(){
-        return Objects.requireNonNull(keyManager);
-    }
 }

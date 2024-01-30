@@ -24,11 +24,10 @@ public class KeyManager {
     private static final int ITERATIONS = 10000;
     private final String password;
 
-    private byte[] HMACSHA256TokenKey = null;
-
+    private HMACSHA256Key hmacsha256Key;
     public KeyManager(String password) throws IOException, ParseException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeySpecException, BadPaddingException, InvalidKeyException {
         this.password = new String(password);
-        this.HMACSHA256TokenKey = decryptBase64StringAES(password, getBase64EncryptedTokenKey());
+        this.hmacsha256Key = new HMACSHA256Key(decryptBase64StringAES(password, getBase64EncryptedTokenKey()));
     }
     private byte[] decryptBase64StringAES(String password, String base64String) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         byte[] bytes = Base64.getDecoder().decode(base64String);
@@ -68,7 +67,7 @@ public class KeyManager {
         return (String)privateConfig.get("encryptedTokenHMACSHA256Key");
     }
 
-    public byte[] getHMACSHA256TokenKey() {
-        return HMACSHA256TokenKey;
+    public HMACSHA256Key getHMACSHA256TokenKey() {
+        return hmacsha256Key;
     }
 }

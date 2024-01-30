@@ -72,11 +72,11 @@ public class Authorization {
     }
 
     public static byte[] generatePasswordHash(String password, byte[] salt) throws NoSuchAlgorithmException, UnsupportedEncodingException {
-        byte[] toHash = new byte[password.length() + salt.length];
         byte[] passwordBytes = password.getBytes();
+        byte[] toHash = new byte[password.length() + salt.length];
 
         System.arraycopy(passwordBytes, 0, toHash, 0, passwordBytes.length);
-        System.arraycopy(salt, 0, toHash, passwordBytes.length, toHash.length);
+        System.arraycopy(salt, 0, toHash, passwordBytes.length, salt.length);
 
         byte[] result = toHash;
 

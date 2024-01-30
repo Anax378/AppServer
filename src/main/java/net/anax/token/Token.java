@@ -8,6 +8,7 @@ import org.json.simple.parser.ParseException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +17,7 @@ import java.util.HashMap;
 
 public class Token {
     HashMap<Claim, String> claims = new HashMap<>();
+    HashMap<TokenHeader, String> headers = new HashMap<>();
     String data;
     String signature;
     public Token(){}
@@ -23,9 +25,40 @@ public class Token {
     public void addClaim(Claim claim, String data){
         claims.put(claim, data);
     }
+
+    public void addHeader(TokenHeader header, String data){
+        headers.put(header, data);
+    }
+
+    public String getHeader(TokenHeader header){
+        return headers.get(header);
+    }
     public String getClaim(Claim claim){
         if(!claims.containsKey(claim)){return null;}
         return claims.get(claim);
+    }
+
+    void generateData() throws UnsupportedEncodingException {
+        JSONObject bodyData = new JSONObject();
+        JSONObject headersData = new JSONObject();
+
+        for(Claim claim : Claim.values()){
+            if(claims.containsKey(claim)){
+                bodyData.put(claim.key, claims.get(claim));
+            }
+        }
+
+        for(TokenHeader header : TokenHeader.values()){
+            if(headers.containsKey(header)){
+                headersData.put(header.headerKey, headers.get(header));
+            }
+        }
+
+        String bodyDataBase64 = Base64.getEncoder().encodeToString(bodyData.toJSONString().getBytes("UTF-8"));
+        String headersDataBase64 = Base64.getEncoder().encodeToString(headersData.toJSONString().getBytes("UTF-8"));
+
+        this.data = headersDataBase64 + "." + bodyDataBase64;
+
     }
 
     public static Token parseToken(String token){
@@ -35,8 +68,10 @@ public class Token {
         byte[] bodyBytes = Base64.getDecoder().decode(parts[1]);
         String headerJson = new String(headerBytes, StandardCharsets.UTF_8);
         String bodyJson = new String(bodyBytes, StandardCharsets.UTF_8);
+
         JSONObject headers;
         JSONObject body;
+
         Token returnToken = new Token();
         try {
             headers = (JSONObject) new JSONParser().parse(headerJson);
@@ -46,12 +81,19 @@ public class Token {
             return null;
         }
 
-        returnToken.data = parts[0] + "." + parts[1];
-        returnToken.signature = parts[2];
-
         for(Claim claim : Claim.values()){
             if(body.containsKey(claim.key)){
                 returnToken.addClaim(claim, (String)body.get(claim.key));
+            }
+        }
+
+        returnToken.data = parts[0] + "." + parts[1];
+        returnToken.signature = parts[2];
+
+
+        for(TokenHeader header : TokenHeader.values()){
+            if(headers.containsKey(header)){
+                returnToken.addHeader(header, (String)headers.get(header.headerKey));
             }
         }
 
@@ -83,6 +125,16 @@ public class Token {
         mac.init(spec);
         byte[] signature = mac.doFinal(this.data.getBytes());
         return Base64.getEncoder().encodeToString(signature);
+    }
+
+    public Token sign(HMACSHA256Key key) throws NoSuchAlgorithmException, InvalidKeyException, UnsupportedEncodingException {
+        this.generateData();
+        this.signature = generateSignature(key);
+        return this;
+    }
+
+    public String getTokenString() throws UnsupportedEncodingException {
+        return data + "." + signature;
     }
 
 

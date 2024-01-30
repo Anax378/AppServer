@@ -2,7 +2,9 @@ package net.anax.thread;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.VirtualFileSystem.UserAuthorizationProfile;
+import net.anax.cryptography.KeyManager;
 import net.anax.database.DatabaseAccessManager;
+import net.anax.endpoint.EndpointFailedException;
 import net.anax.http.*;
 import net.anax.logging.Logger;
 
@@ -16,6 +18,7 @@ public class WorkerThread extends Thread{
     private int timeOutTimeMillis = 10000;
     private HTTPParser parser = new HTTPParser();
     Socket socket;
+    KeyManager keyManager;
 
     public int getTimeOutTimeMillis() {
         return timeOutTimeMillis;
@@ -25,7 +28,8 @@ public class WorkerThread extends Thread{
         this.timeOutTimeMillis = timeOutTimeMillis;
     }
 
-    public WorkerThread(Socket socket) throws SocketException {
+    public WorkerThread(Socket socket, KeyManager keyManager) throws SocketException {
+        this.keyManager = keyManager;
         this.socket = socket;
     }
 
@@ -33,6 +37,9 @@ public class WorkerThread extends Thread{
     public void run() {
         InputStream inputStream = null;
         OutputStream outputStream = null;
+
+        DatabaseAccessManager.getInstance().setKeyManager(keyManager);
+
         try {
             socket.setSoTimeout(timeOutTimeMillis);
         } catch (SocketException e) {
@@ -48,17 +55,50 @@ public class WorkerThread extends Thread{
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
                 //handle request
-                String body = DatabaseAccessManager.getInstance().getDataFromURI(request.getURI(), new UserAuthorizationProfile(-1){@Override public boolean isAdmin() {return true;}});
 
-                if(body == null){
-                    response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
-                    response.setBody("404 not found<br>currently implemented file system schema:<br><img src=\"http://media.discordapp.net/attachments/1158003459073785896/1158075668958031882/IMPLEMENTED_FILE_STRUCUTRE.drawio.png?ex=651aed83&is=65199c03&hm=4597daf7ad29b28c2c93b3754df489f8ebca21d2fbe6ee5957ee387ef841922d&=&width=672&height=577\">");
-                    response.setHeader(HTTPHeaderType.Content_type, "text/html");
-                    response.setHeader(HTTPHeaderType.Access_Control_Allow_Origin, "*");
-                }else{
+                String body = null;
+
+                try {
+                    body = DatabaseAccessManager.getInstance().handleRequest(request.getURI(), request.getBody(), new AuthorizationProfile() {
+                        @Override
+                        public boolean isAdmin() {
+                            return true;
+                        }
+
+                        @Override
+                        public int getId() {
+                            return -1;
+                        }
+                    });
+
+                    if(body == null){
+                        throw new EndpointFailedException("endpoint not found", EndpointFailedException.Reason.DataNotFound);
+                    }
+
                     response.setBody(body);
+                    response.setStatusCode(HTTPStatusCode.OK_200);
+
+                }catch (EndpointFailedException e){
+                        if(e.reason == EndpointFailedException.Reason.DataNotFound){
+                            response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
+                            response.setBody("Data not found");
+                        }
+                        else if(e.reason == EndpointFailedException.Reason.NothingChanged){
+                            response.setStatusCode(HTTPStatusCode.SERVER_ERROR_500_INTERNAL_SERVER_ERROR);
+                            response.setBody("Nothing changed");
+                        }
+                        else if (e.reason == EndpointFailedException.Reason.AccessDenied){
+                            response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_403_FORBIDDEN);
+                            response.setBody("Access Denied");
+                        }
+                        else if (e.reason == EndpointFailedException.Reason.UnexpectedError){
+                            response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_414_URI_TOO_LONG);
+                            response.setBody("Unexpected Error");
+                        }
+                        e.printStackTrace();
                 }
-                response.writeOnStream(outputStream);
+
+               response.writeOnStream(outputStream);
             } catch (HTTPParsingException e) {
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, e.getStatusCode());
                 response.writeOnStream(outputStream);

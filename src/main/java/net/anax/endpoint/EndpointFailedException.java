@@ -1,8 +1,10 @@
 package net.anax.endpoint;
 
 public class EndpointFailedException extends Exception {
-    public EndpointFailedException(String userNotAuthorized, Reason reason) {
-
+    public Reason reason;
+    public EndpointFailedException(String message, Reason reason) {
+        super(message);
+        this.reason = reason;
     }
 
     public static enum Reason {

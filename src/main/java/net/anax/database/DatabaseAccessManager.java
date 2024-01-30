@@ -1,6 +1,9 @@
 package net.anax.database;
 
 import net.anax.VirtualFileSystem.*;
+import net.anax.cryptography.KeyManager;
+import net.anax.endpoint.EndpointFailedException;
+import net.anax.endpoint.EndpointManager;
 import net.anax.logging.Logger;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -13,9 +16,8 @@ import java.sql.*;
 
 public class DatabaseAccessManager {
     private static DatabaseAccessManager instance;
-    private AbstractVirtualNode ROOT_NODE;
 
-    private SpecifiedDatabaseStructure specificDatabase = null;
+    EndpointManager endpointManager;
 
     Connection connection;
 
@@ -23,6 +25,11 @@ public class DatabaseAccessManager {
     String database_password;
     String database_address;
 
+    KeyManager keyManager;
+
+    public void setKeyManager(KeyManager keyManager){
+        getInstance().keyManager = keyManager;
+    }
     public DatabaseAccessManager(){
         try {
             JSONObject config = (JSONObject) new JSONParser().parse(new FileReader("config.json"));
@@ -48,10 +55,7 @@ public class DatabaseAccessManager {
             throw new RuntimeException(e);
         }
 
-        specificDatabase = SpecifiedDatabaseStructure.getINSTANCE();
-        specificDatabase.setConnection(connection);
-        ROOT_NODE = specificDatabase.getROOT();
-
+        endpointManager = new EndpointManager(connection);
     }
 
 
@@ -61,24 +65,30 @@ public class DatabaseAccessManager {
         }
         return instance;
     }
-
-    public String getDataFromURI(String URI,  AuthorizationProfile auth){
+    public String handleRequest(String URI, String payload, AuthorizationProfile auth) throws EndpointFailedException {
         if(URI.charAt(0) == '/'){
             URI = URI.substring(1);
         }
 
-        String[] parts = URI.split("/");
-        if(parts.length == 0){return null;}
-        VirtualPathNode lastNode = null;
-        for(int i = parts.length - 1; i >= 0; i--){
-            lastNode = new VirtualPathNode(parts[i], lastNode);
+        ;System.out.println("URI: " + URI);
+
+        JSONParser parser = new JSONParser();
+        JSONObject data = null;
+
+        try {
+            data = (JSONObject) parser.parse(payload);
+            return endpointManager.callEndpoint(URI, data, auth);
+
+        } catch (ParseException e) {
+            throw new EndpointFailedException("invalid payload", EndpointFailedException.Reason.UnexpectedError);
+        }catch (EndpointFailedException e){
+            Logger.log(e.getMessage());
+            throw e;
         }
-        AbstractVirtualNode file = ROOT_NODE.getFileFromPATH(lastNode, auth);
-        if(file != null){
-            return file.readData(auth);
-        }
-        System.out.println("404 not found: " + URI);
-        return null;
+    }
+
+    public KeyManager getKeyManager(){
+        return this.keyManager;
     }
 
 }

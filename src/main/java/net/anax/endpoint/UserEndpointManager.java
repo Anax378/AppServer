@@ -1,17 +1,25 @@
 package net.anax.endpoint;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
+import net.anax.cryptography.KeyManager;
 import net.anax.database.Authorization;
+import net.anax.database.DatabaseAccessManager;
+import net.anax.magic.MagicStrings;
+import net.anax.token.Claim;
+import net.anax.token.Token;
+import net.anax.token.TokenHeader;
+import net.anax.util.ByteUtilities;
 import net.anax.util.DatabaseUtilities;
+import net.anax.util.JsonUtilities;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.Arrays;
+import java.util.UUID;
 
 public class UserEndpointManager {
     Connection connection;
@@ -20,6 +28,93 @@ public class UserEndpointManager {
         this.connection = connection;
     }
 
+    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth) throws EndpointFailedException {
+        switch(endpoint){
+            case ("getUsername") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"id"}, new Class[]{Long.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return getUsername((int)(long)data.get("id"), auth);
+            }
+            case("getUser") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"id"}, new Class[]{Long.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return getUser((int)(long)data.get("id"), auth);
+            }
+            case ("setUsername") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"id", "newUsername"}, new Class[]{Long.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return setUsername((int)(long)data.get("id"), (String)data.get("newUsername"), auth);
+            }
+            case("createUser") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"username", "password", "name"}, new Class[]{String.class, String.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return createUser((String)data.get("username"), (String)data.get("password"), (String)data.get("name"), auth);
+            }
+
+            case("setName") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"id", "newName"}, new Class[]{Long.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return setName((int)(long)data.get("id"), (String)data.get("newName"), auth);
+            }
+
+            case("login") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"username", "password"}, new Class[]{String.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return login((String) data.get("username"), (String)data.get("password"), DatabaseAccessManager.getInstance().getKeyManager());
+            }
+        }
+        return null;
+    }
+
+    public String login(String username, String passwordAttempt, KeyManager keyManager) throws EndpointFailedException {
+        try {
+            PreparedStatement statement = connection.prepareStatement("SELECT password_hash, hash_salt, id FROM user WHERE username=?");
+            statement.setString(1, username);
+            ResultSet set = statement.executeQuery();
+
+            if(!set.next()){throw new EndpointFailedException("user not found", EndpointFailedException.Reason.DataNotFound);}
+
+            String passwordHash = set.getString("password_hash");
+            String hashSalt = set.getString("hash_salt");
+            int id = set.getInt("id");
+
+            byte[] passwordHashBytes = ByteUtilities.fromHexString(passwordHash);
+            byte[] hashSaltBytes = ByteUtilities.fromHexString(hashSalt);
+
+            byte[] hashedPasswordAttempt = Authorization.generatePasswordHash(passwordAttempt, hashSaltBytes);
+
+            ;System.out.println("password attempt hash: " + Arrays.toString(hashedPasswordAttempt));
+            ;System.out.println("actual password hash: " + Arrays.toString(passwordHashBytes));
+
+            for(int i = 0; i < hashedPasswordAttempt.length; i++){
+                if(hashedPasswordAttempt[i] != passwordHashBytes[i]){
+                    throw new EndpointFailedException("Access Denied, invalid password", EndpointFailedException.Reason.AccessDenied);
+                }
+            }
+
+            Token authToken = new Token();
+
+            UUID tokenId = UUID.randomUUID();
+
+            authToken.addClaim(Claim.ExpirationTimestamp, String.valueOf(System.currentTimeMillis() + (1000 * 60 * 10))); //make the token expire after 10 minutes;
+            authToken.addClaim(Claim.Subject, String.valueOf(id));
+            authToken.addClaim(Claim.IssuedAt, String.valueOf(System.currentTimeMillis()));
+            authToken.addClaim(Claim.Identifier, tokenId.toString());
+            authToken.addHeader(TokenHeader.Type, MagicStrings.tokenType);
+            authToken.addHeader(TokenHeader.Algorithm, "HMACSHA256");
+            authToken.sign(keyManager.getHMACSHA256TokenKey());
+
+            JSONObject data = new JSONObject();
+            data.put("id", id);
+            data.put("token", authToken.getTokenString());
+
+            return data.toJSONString();
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+        } catch (UnsupportedEncodingException e) {
+            throw new EndpointFailedException("invalid string literal", EndpointFailedException.Reason.UnexpectedError);
+        } catch (NoSuchAlgorithmException e) {
+            throw new EndpointFailedException("invalid string literal", EndpointFailedException.Reason.UnexpectedError);
+        } catch (InvalidKeyException e) {
+            throw new EndpointFailedException("invalid key", EndpointFailedException.Reason.UnexpectedError);
+        }
+
+    }
     public String getUsername(int id, AuthorizationProfile auth) throws EndpointFailedException {
         if (auth.isAdmin() || auth.getId() == id || Authorization.sharesGroupWith(auth, id, connection)) {
             String username = DatabaseUtilities.queryString("username", "user", id, connection);
@@ -32,6 +127,22 @@ public class UserEndpointManager {
 
         }
         throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
+    }
+
+    public String setName(int id, String newName, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && auth.getId() != id){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+
+        try {
+            PreparedStatement statement = connection.prepareStatement("UPDATE user SeT name=? WHERE id=?");
+            statement.setString(1, newName);
+            statement.setInt(2, id);
+            if(statement.executeUpdate() == 0){throw new EndpointFailedException("nothing changed" ,EndpointFailedException.Reason.NothingChanged);}
+
+            return "{\"success\":true}";
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql exception", EndpointFailedException.Reason.UnexpectedError);
+        }
     }
 
     public String getUser(int id, AuthorizationProfile auth) throws EndpointFailedException {
@@ -67,6 +178,8 @@ public class UserEndpointManager {
                     group_id_array.add(result.getInt("group_id"));
                 }
 
+                data.put("name", DatabaseUtilities.queryString("name", "user", id, connection));
+
                 data.put("groupIds", group_id_array);
 
                 return data.toJSONString();
@@ -99,33 +212,40 @@ public class UserEndpointManager {
         throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
     }
 
-    public String createUser(String username, String password, AuthorizationProfile auth) throws EndpointFailedException {
+    public String createUser(String username, String password, String name, AuthorizationProfile auth) throws EndpointFailedException {
         try {
 
             byte[] salt = Authorization.generateSalt();
             byte[] passwordHash = Authorization.generatePasswordHash(password, salt);
 
-            PreparedStatement statement = connection.prepareStatement("INSERT INTO user (username, password_hash, hash_salt) VALUES (?, ?, ?);");
+            PreparedStatement statement = connection.prepareStatement("INSERT INTO user (username, password_hash, hash_salt, name) VALUES (?, ?, ?, ?);", Statement.RETURN_GENERATED_KEYS);
+
             statement.setString(1, username);
-            statement.setBytes(2, passwordHash);
-            statement.setBytes(3, salt);
+            statement.setString(2, ByteUtilities.toHexString(passwordHash));
+            statement.setString(3, ByteUtilities.toHexString(salt));
+            statement.setString(4, name);
+
             int affected = statement.executeUpdate();
+            ResultSet result = statement.getGeneratedKeys();
+
             if(affected == 0){
                 throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.UnexpectedError);
             }
 
-            PreparedStatement idStatement = connection.prepareStatement("SELECT id FROM user WHERE username=?");
-            idStatement.setString(1, username);
-            ResultSet result = idStatement.executeQuery();
+
             if(!result.next()){throw new EndpointFailedException("cannot find the id of the user just created", EndpointFailedException.Reason.UnexpectedError);}
+
             JSONObject data = new JSONObject();
-            data.put("id", result.getInt("id"));
+            data.put("id", result.getInt(1));
             return data.toJSONString();
 
         } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
             throw new EndpointFailedException("Invalid String literal, this should never happen", EndpointFailedException.Reason.UnexpectedError);
         } catch (SQLException e) {
+            ;e.printStackTrace();
             throw new EndpointFailedException("sql unexpected error", EndpointFailedException.Reason.UnexpectedError);
+
         }
     }
+
 }

@@ -3,13 +3,11 @@ package net.anax.endpoint;
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.database.Authorization;
 import net.anax.util.DatabaseUtilities;
+import net.anax.util.JsonUtilities;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 
 public class GroupEndpointManager {
     Connection connection;
@@ -17,15 +15,48 @@ public class GroupEndpointManager {
         this.connection = connection;
     }
 
-    public String getGroup(int groupId, AuthorizationProfile auth) throws EndpointFailedException {
-        if(!Authorization.isMemberOfGroup(auth, groupId, connection) || auth.isAdmin()){
-            throw new EndpointFailedException("Access Denoed", EndpointFailedException.Reason.AccessDenied);
+    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth) throws EndpointFailedException {
+        switch(endpoint){
+            case("getGroup") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return getGroup((int)(long)data.get("groupId"), auth);
+            }
+            case("setName") ->{
+                if(!JsonUtilities.validateKeys(new String[]{"groupId", "newName"}, new Class<?>[]{Long.class, String.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return setName((int)(long)data.get("groupId"), (String) data.get("newName"), auth);
+            }
+            case("setTreasurerUserId") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"groupId", "newTreasurerUserId"}, new Class<?>[]{Long.class, Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return setTreasurerUserId((int)(long) data.get("groupId"), (int)(long) data.get("newTreasurerUserId"), auth);
+            }
+            case("setAdminUserId") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"groupId", "newAdminId"}, new Class<?>[]{Long.class, Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return setAdminUserId((int)(long) data.get("groupId"), (int)(long) data.get("newAdminId"), auth);
+            }
+            case("setIsInGroup") ->{
+                if(!JsonUtilities.validateKeys(new String[]{"groupId","userId", "isInGroup"}, new Class<?>[]{Long.class, Long.class, Boolean.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return setIsInGroup((int)(long) data.get("groupId"), (int)(long) data.get("userId"), (boolean) data.get("isInGroup"), auth);
+            }
+            case("createGroup") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"name", "authorUserId"}, new Class<?>[]{String.class, Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return createGroup((String) data.get("name"), (int)(long) data.get("authorUserId"), auth);
+            }
+            case("removeTreasurer") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return removeTreasurer((int)(long) data.get("groupId"), auth);
+            }
         }
+        return null;
+    }
+
+
+    public String getGroup(int groupId, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!Authorization.isMemberOfGroup(auth, groupId, connection) && !auth.isAdmin()){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
 
         String name = DatabaseUtilities.queryString("name", "group_table", groupId, connection);
         String treasurerUserId = DatabaseUtilities.queryString("treasurer_user_id", "group_table", groupId, connection);
         String adminUserId = DatabaseUtilities.queryString("admin_id", "group_table", groupId, connection);
-        if(name == null || treasurerUserId == null || adminUserId == null){throw new EndpointFailedException("data not found", EndpointFailedException.Reason.DataNotFound);}
+        if(name == null || adminUserId == null){throw new EndpointFailedException("data not found", EndpointFailedException.Reason.DataNotFound);}
 
         try {
             PreparedStatement statement = connection.prepareStatement("SELECT user_id FROM user_group WHERE group_id=?");
@@ -130,7 +161,7 @@ public class GroupEndpointManager {
     public String createGroup(String name, int authorUserId, AuthorizationProfile auth) throws EndpointFailedException {
         if(!auth.isAdmin() && auth.getId() != authorUserId){throw new EndpointFailedException("Access Denied",EndpointFailedException.Reason.AccessDenied);}
         try {
-            PreparedStatement statement = connection.prepareStatement("INSERT INTO group_table (name, admin_id) VALUES (?, ?);");
+            PreparedStatement statement = connection.prepareStatement("INSERT INTO group_table (name, admin_id) VALUES (?, ?);", Statement.RETURN_GENERATED_KEYS);
             statement.setString(1, name);
             statement.setInt(2, authorUserId);
             statement.executeUpdate();
