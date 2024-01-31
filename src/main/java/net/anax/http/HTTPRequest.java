@@ -42,4 +42,22 @@ public class HTTPRequest {
         }
         return "";
     }
+
+    public void printSelf(){
+        System.out.println("============== HttpRequest printSelf() Start =====================");
+        System.out.println("Method: " + method.name());
+        System.out.println("URI: " + URI);
+
+        System.out.println("------- start of HttpRequest printSelf() Headers ---------");
+        for(HTTPHeaderType type : headers.keySet()){
+            System.out.println(type.name + ": " + headers.get(type));
+        }
+        System.out.println("------- end of HttpRequest printSelf() Headers ---------");
+
+        System.out.println("body: " + body);
+
+
+        System.out.println("============== HttpRequest printSelf() End =====================");
+
+    }
 }

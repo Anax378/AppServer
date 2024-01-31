@@ -27,7 +27,6 @@ public class EndpointManager {
         if(parts.length < 2){throw new EndpointFailedException("invalid url", EndpointFailedException.Reason.DataNotFound);}
         String ret = null;
 
-        ;System.out.println(Arrays.toString(parts));
 
         try {
             PreparedStatement statement = connection.prepareStatement("START TRANSACTION;");

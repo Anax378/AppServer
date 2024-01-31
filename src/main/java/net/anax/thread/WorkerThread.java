@@ -3,10 +3,14 @@ package net.anax.thread;
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.VirtualFileSystem.UserAuthorizationProfile;
 import net.anax.cryptography.KeyManager;
+import net.anax.database.Authorization;
 import net.anax.database.DatabaseAccessManager;
 import net.anax.endpoint.EndpointFailedException;
 import net.anax.http.*;
 import net.anax.logging.Logger;
+import net.anax.token.Claim;
+import net.anax.token.Token;
+import net.anax.util.StringUtilities;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,22 +58,29 @@ public class WorkerThread extends Thread{
                 HTTPRequest request = parser.parseRequest(inputStream);
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
-                //handle request
-
                 String body = null;
 
                 try {
-                    body = DatabaseAccessManager.getInstance().handleRequest(request.getURI(), request.getBody(), new AuthorizationProfile() {
-                        @Override
-                        public boolean isAdmin() {
-                            return true;
-                        }
 
-                        @Override
-                        public int getId() {
-                            return -1;
+                    AuthorizationProfile auth = new UserAuthorizationProfile(-1);
+                    String tokenString = request.getHeader(HTTPHeaderType.Authorization).replace("Bearer", "");
+                    Token token = Token.parseToken(tokenString.trim());
+
+                    if(token != null){
+                        if(token.validateSignature(keyManager.getHMACSHA256TokenKey())){
+                            String expirationTime = token.getClaim(Claim.ExpirationTimestamp);
+                            if(StringUtilities.isLong(expirationTime)){
+                                if(Long.parseLong(expirationTime) > System.currentTimeMillis()){
+                                    String id = token.getClaim(Claim.Subject);
+                                    if(StringUtilities.isInteger(id)){
+                                        auth = new UserAuthorizationProfile(Integer.parseInt(id));
+                                    }
+                                }
+                            }
                         }
-                    });
+                    }
+
+                    body = DatabaseAccessManager.getInstance().handleRequest(request.getURI(), request.getBody(), auth);
 
                     if(body == null){
                         throw new EndpointFailedException("endpoint not found", EndpointFailedException.Reason.DataNotFound);

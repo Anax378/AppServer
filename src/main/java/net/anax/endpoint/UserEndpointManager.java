@@ -77,9 +77,6 @@ public class UserEndpointManager {
 
             byte[] hashedPasswordAttempt = Authorization.generatePasswordHash(passwordAttempt, hashSaltBytes);
 
-            ;System.out.println("password attempt hash: " + Arrays.toString(hashedPasswordAttempt));
-            ;System.out.println("actual password hash: " + Arrays.toString(passwordHashBytes));
-
             for(int i = 0; i < hashedPasswordAttempt.length; i++){
                 if(hashedPasswordAttempt[i] != passwordHashBytes[i]){
                     throw new EndpointFailedException("Access Denied, invalid password", EndpointFailedException.Reason.AccessDenied);
@@ -187,8 +184,6 @@ public class UserEndpointManager {
             } catch (SQLException e) {
                 throw new EndpointFailedException("sql exception", EndpointFailedException.Reason.UnexpectedError);
             }
-
-
         }
         throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
     }

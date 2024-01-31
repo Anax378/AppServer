@@ -70,7 +70,6 @@ public class DatabaseAccessManager {
             URI = URI.substring(1);
         }
 
-        ;System.out.println("URI: " + URI);
 
         JSONParser parser = new JSONParser();
         JSONObject data = null;

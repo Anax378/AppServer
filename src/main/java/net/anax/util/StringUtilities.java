@@ -11,7 +11,14 @@ public class StringUtilities {
             return false;
         }
     };
-
+    public static boolean isLong(String string){
+        try{
+            Long.parseLong(string);
+            return true;
+        }catch (NumberFormatException e){
+            return false;
+        }
+    };
     public static String simpleWrapInJson(String value, String key){
         if(value == null){return null;}
         JSONObject json = new JSONObject();

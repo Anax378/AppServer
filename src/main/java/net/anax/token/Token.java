@@ -19,7 +19,7 @@ public class Token {
     HashMap<Claim, String> claims = new HashMap<>();
     HashMap<TokenHeader, String> headers = new HashMap<>();
     String data;
-    String signature;
+    public String signature;
     public Token(){}
 
     public void addClaim(Claim claim, String data){
@@ -100,8 +100,7 @@ public class Token {
         return returnToken;
     }
 
-    boolean validateSignature(HMACSHA256Key key){
-        String data = this.data;
+    public boolean validateSignature(HMACSHA256Key key){
         try {
             String correct_signature_string = this.generateSignature(key);
             if(correct_signature_string.equals(this.signature)){
@@ -119,7 +118,7 @@ public class Token {
         return false;
     }
 
-    String generateSignature(HMACSHA256Key key) throws InvalidKeyException, NoSuchAlgorithmException {
+    public String generateSignature(HMACSHA256Key key) throws InvalidKeyException, NoSuchAlgorithmException {
         Mac mac = Mac.getInstance("HmacSHA256");
         SecretKeySpec spec = new SecretKeySpec(key.key, "HmacSHA256");
         mac.init(spec);
