@@ -142,6 +142,21 @@ public class UserEndpointManager {
         }
     }
 
+    public String getName(int id, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && !Authorization.sharesGroupWith(auth, id, connection)){
+            throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
+        }
+
+        String name = DatabaseUtilities.queryString("name", "user", id, connection);
+        if(name == null){throw new EndpointFailedException("Data not found", EndpointFailedException.Reason.DataNotFound);}
+
+        JSONObject data = new JSONObject();
+        data.put("name", name);
+        return data.toJSONString();
+
+
+    }
+
     public String getUser(int id, AuthorizationProfile auth) throws EndpointFailedException {
         if(auth.isAdmin() || auth.getId() == id){
             try {

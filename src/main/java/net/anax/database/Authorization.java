@@ -1,15 +1,12 @@
 package net.anax.database;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
-import net.anax.endpoint.EndpointFailedException;
-
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 
 public class Authorization {
