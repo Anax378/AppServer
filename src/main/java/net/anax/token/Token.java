@@ -109,10 +109,8 @@ public class Token {
             return false;
 
         } catch (NoSuchAlgorithmException e) {
-            Logger.log("invalid algorithm, invalid string literal. lid: 154619845358432");
             return false;
         } catch (InvalidKeyException e) {
-            Logger.log("invalidKeyException. lid: 353521354231");
             if(true){return false;} //prevent unreachable code exception further down;
         }
         return false;
@@ -136,5 +134,12 @@ public class Token {
         return data + "." + signature;
     }
 
-
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("{claims: ").append(claims.toString()).append(", headers: ").append(headers.toString());
+        builder.append(", data: ").append(data);
+        builder.append(", signature: ").append(signature).append("}");
+        return builder.toString();
+    }
 }

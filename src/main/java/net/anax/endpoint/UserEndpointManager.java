@@ -4,6 +4,7 @@ import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.cryptography.KeyManager;
 import net.anax.database.Authorization;
 import net.anax.database.DatabaseAccessManager;
+import net.anax.logging.Logger;
 import net.anax.magic.MagicStrings;
 import net.anax.token.Claim;
 import net.anax.token.Token;
@@ -28,7 +29,8 @@ public class UserEndpointManager {
         this.connection = connection;
     }
 
-    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth) throws EndpointFailedException {
+    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth, long traceId) throws EndpointFailedException {
+
         switch(endpoint){
             case ("getUsername") -> {
                 if(!JsonUtilities.validateKeys(new String[]{"id"}, new Class[]{Long.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
@@ -46,6 +48,10 @@ public class UserEndpointManager {
                 if(!JsonUtilities.validateKeys(new String[]{"username", "password", "name"}, new Class[]{String.class, String.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
                 return createUser((String)data.get("username"), (String)data.get("password"), (String)data.get("name"), auth);
             }
+            case("getName") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"id"}, new Class[]{Long.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return getName((int)(long)data.get("id"), auth);
+            }
 
             case("setName") -> {
                 if(!JsonUtilities.validateKeys(new String[]{"id", "newName"}, new Class[]{Long.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
@@ -56,6 +62,7 @@ public class UserEndpointManager {
                 if(!JsonUtilities.validateKeys(new String[]{"username", "password"}, new Class[]{String.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
                 return login((String) data.get("username"), (String)data.get("password"), DatabaseAccessManager.getInstance().getKeyManager());
             }
+            default -> {Logger.log("could not find a enpoint [" + endpoint + "] in user", traceId);}
         }
         return null;
     }
@@ -143,7 +150,7 @@ public class UserEndpointManager {
     }
 
     public String getName(int id, AuthorizationProfile auth) throws EndpointFailedException {
-        if(!auth.isAdmin() && !Authorization.sharesGroupWith(auth, id, connection)){
+        if(!auth.isAdmin() && auth.getId() != id && !Authorization.sharesGroupWith(auth, id, connection)){
             throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
         }
 

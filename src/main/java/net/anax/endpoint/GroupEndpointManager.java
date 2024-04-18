@@ -2,6 +2,7 @@ package net.anax.endpoint;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.database.Authorization;
+import net.anax.logging.Logger;
 import net.anax.util.DatabaseUtilities;
 import net.anax.util.JsonUtilities;
 import org.json.simple.JSONArray;
@@ -15,7 +16,7 @@ public class GroupEndpointManager {
         this.connection = connection;
     }
 
-    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth) throws EndpointFailedException {
+    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth, long traceId) throws EndpointFailedException {
         switch(endpoint){
             case("getGroup") -> {
                 if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
@@ -45,6 +46,7 @@ public class GroupEndpointManager {
                 if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
                 return removeTreasurer((int)(long) data.get("groupId"), auth);
             }
+            default -> {Logger.log("could not find endpoint [" + endpoint + "] in grouop", traceId);}
         }
         return null;
     }
@@ -79,6 +81,7 @@ public class GroupEndpointManager {
             data.put("treasurerUserId", treasurerUserId);
             data.put("userIds", userIds);
             data.put("taskIds", taskIds);
+            data.put("admin_id", adminUserId);
 
             return data.toJSONString();
 

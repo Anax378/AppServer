@@ -24,7 +24,6 @@ public abstract class AbstractVirtualFolder {
         if((nextFolder = this.getFolder(node.data, auth)) != null){
             return nextFolder.getFileFromPATH(node.next, auth);
         }
-        System.out.println(node.data + "not found in " + this.name);
         return null;
     }
 

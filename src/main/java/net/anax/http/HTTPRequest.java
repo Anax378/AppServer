@@ -7,11 +7,17 @@ public class HTTPRequest {
     private String URI;
     private HashMap<HTTPHeaderType, String> headers = new HashMap<>();
     private String body;
+    byte[] rawInput;
+
+
 
     public String getBody() {
         return body;
     }
 
+    public byte[] getRawInput(){
+        return rawInput;
+    }
     public void setBody(String body) {
         this.body = body;
     }

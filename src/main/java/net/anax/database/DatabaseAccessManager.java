@@ -37,13 +37,13 @@ public class DatabaseAccessManager {
             database_address = (String) config.get("database_address");
             database_password = (String) config.get("database_password");
         } catch (FileNotFoundException e) {
-            Logger.log("Could not find config file");
+            Logger.log("Could not find config file", 0);
             throw new RuntimeException(e);
         } catch (IOException e) {
-            Logger.log("Cannot read config ");
+            Logger.log("Cannot read config ", 0);
             throw new RuntimeException(e);
         } catch (ParseException e) {
-            Logger.log("Could not parse config file");
+            Logger.log("Could not parse config file", 0);
         }
 
         try {
@@ -65,23 +65,22 @@ public class DatabaseAccessManager {
         }
         return instance;
     }
-    public String handleRequest(String URI, String payload, AuthorizationProfile auth) throws EndpointFailedException {
+    public String handleRequest(String URI, String payload, AuthorizationProfile auth, long traceId) throws EndpointFailedException {
         if(URI.charAt(0) == '/'){
             URI = URI.substring(1);
         }
-
 
         JSONParser parser = new JSONParser();
         JSONObject data = null;
 
         try {
             data = (JSONObject) parser.parse(payload);
-            return endpointManager.callEndpoint(URI, data, auth);
+            return endpointManager.callEndpoint(URI, data, auth, traceId);
 
         } catch (ParseException e) {
-            throw new EndpointFailedException("invalid payload", EndpointFailedException.Reason.UnexpectedError);
+            throw new EndpointFailedException("could not parse payload to json", EndpointFailedException.Reason.UnexpectedError);
         }catch (EndpointFailedException e){
-            Logger.log(e.getMessage());
+            Logger.log(e.getMessage(), traceId);
             throw e;
         }
     }

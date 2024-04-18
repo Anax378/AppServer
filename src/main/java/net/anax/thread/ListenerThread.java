@@ -1,6 +1,7 @@
 package net.anax.thread;
 
 import net.anax.cryptography.KeyManager;
+import net.anax.logging.Logger;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -19,7 +20,9 @@ public class ListenerThread extends Thread{
         while(!serverSocket.isClosed() && serverSocket.isBound()){
             try {
                 Socket socket = serverSocket.accept();
-                WorkerThread workerThread = new WorkerThread(socket, keyManager);
+                long traceId = Logger.generateTraceId();
+                WorkerThread workerThread = new WorkerThread(socket, keyManager, traceId);
+                Logger.log("accepted connection", traceId);
                 workerThread.start();
             } catch (IOException e) {
                 throw new RuntimeException(e);

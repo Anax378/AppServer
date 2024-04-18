@@ -17,12 +17,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Arrays;
 
 public class WorkerThread extends Thread{
     private int timeOutTimeMillis = 10000;
     private HTTPParser parser = new HTTPParser();
     Socket socket;
     KeyManager keyManager;
+    long traceId;
 
     public int getTimeOutTimeMillis() {
         return timeOutTimeMillis;
@@ -32,9 +34,10 @@ public class WorkerThread extends Thread{
         this.timeOutTimeMillis = timeOutTimeMillis;
     }
 
-    public WorkerThread(Socket socket, KeyManager keyManager) throws SocketException {
+    public WorkerThread(Socket socket, KeyManager keyManager, long traceId) throws SocketException {
         this.keyManager = keyManager;
         this.socket = socket;
+        this.traceId = traceId;
     }
 
     @Override
@@ -45,8 +48,9 @@ public class WorkerThread extends Thread{
         DatabaseAccessManager.getInstance().setKeyManager(keyManager);
 
         try {
-            socket.setSoTimeout(timeOutTimeMillis);
+            socket.setSoTimeout(getTimeOutTimeMillis());
         } catch (SocketException e) {
+            Logger.error("could not set socket timeout", traceId);
             throw new RuntimeException(e);
         }
         try {
@@ -56,6 +60,8 @@ public class WorkerThread extends Thread{
 
             try {
                 HTTPRequest request = parser.parseRequest(inputStream);
+                Logger.info("request bytes: " + Arrays.toString(request.getRawInput()), traceId);
+                Logger.info("request: " + new String(request.getRawInput()), traceId);
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
                 String body = null;
@@ -74,13 +80,14 @@ public class WorkerThread extends Thread{
                                     String id = token.getClaim(Claim.Subject);
                                     if(StringUtilities.isInteger(id)){
                                         auth = new UserAuthorizationProfile(Integer.parseInt(id));
+                                        Logger.info("authorized token " + token, traceId);
                                     }
-                                }
-                            }
-                        }
-                    }
+                                }else{Logger.log("expired token " + token, traceId);}
+                            }else{Logger.log("invalid data in token  " + token, traceId);}
+                        }else{Logger.log("could not verify token " + token, traceId);}
+                    }else{Logger.log("token is null", traceId);}
 
-                    body = DatabaseAccessManager.getInstance().handleRequest(request.getURI(), request.getBody(), auth);
+                    body = DatabaseAccessManager.getInstance().handleRequest(request.getURI(), request.getBody(), auth, traceId);
 
                     if(body == null){
                         throw new EndpointFailedException("endpoint not found", EndpointFailedException.Reason.DataNotFound);
@@ -93,30 +100,35 @@ public class WorkerThread extends Thread{
                         if(e.reason == EndpointFailedException.Reason.DataNotFound){
                             response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
                             response.setBody("Data not found");
+                            Logger.log("returning 404, data not found", traceId);
                         }
                         else if(e.reason == EndpointFailedException.Reason.NothingChanged){
                             response.setStatusCode(HTTPStatusCode.SERVER_ERROR_500_INTERNAL_SERVER_ERROR);
                             response.setBody("Nothing changed");
+                            Logger.log("returning 500, nothing changed", traceId);
                         }
                         else if (e.reason == EndpointFailedException.Reason.AccessDenied){
                             response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_403_FORBIDDEN);
                             response.setBody("Access Denied");
+                            Logger.log("returning 403, forbidden", traceId);
                         }
                         else if (e.reason == EndpointFailedException.Reason.UnexpectedError){
                             response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_414_URI_TOO_LONG);
                             response.setBody("Unexpected Error");
+                            Logger.log("returning 414, unexpected error", traceId);
                         }
                         e.printStackTrace();
                 }
 
-               response.writeOnStream(outputStream);
+               response.writeOnStream(outputStream, traceId);
             } catch (HTTPParsingException e) {
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, e.getStatusCode());
-                response.writeOnStream(outputStream);
+                response.writeOnStream(outputStream, traceId);
             }
 
 
         } catch (IOException e) {
+            Logger.error("IO Exception", traceId);
             throw new RuntimeException(e);
         }finally {
             try {

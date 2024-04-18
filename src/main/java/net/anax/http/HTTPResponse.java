@@ -1,8 +1,11 @@
 package net.anax.http;
 
+import net.anax.logging.Logger;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 
 public class HTTPResponse {
@@ -75,8 +78,9 @@ public class HTTPResponse {
         return data.toString();
     }
 
-    public void writeOnStream(OutputStream outputStream) {
+    public void writeOnStream(OutputStream outputStream, long traceId) {
         try {
+            Logger.info("writing on outputStream: " + Arrays.toString(this.getData().getBytes(StandardCharsets.US_ASCII)), traceId);
             outputStream.write(this.getData().getBytes(StandardCharsets.US_ASCII));
         } catch (IOException e) {
             e.printStackTrace();

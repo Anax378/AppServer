@@ -3,6 +3,7 @@ package net.anax.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 
 public class HTTPParser {
     private static final int CR = 13; // Carriage return
@@ -21,9 +22,17 @@ public class HTTPParser {
         this.maxSectionLength = maxSectionLength;
     }
 
+    int readByte(InputStream istream, ArrayList<Byte> bytes) throws IOException {
+        int _byte = istream.read();
+        bytes.add((byte) _byte);
+        return _byte;
+    }
     public HTTPRequest parseRequest(InputStream inputStream) throws IOException, HTTPParsingException {
+
         HTTPRequest request = new HTTPRequest();
-        parseLine(inputStream, request);
+
+        ArrayList<Byte> istreamBytes = new ArrayList<>();
+        parseLine(inputStream, request, istreamBytes);
 
         if(request.getMethod() == null){
             throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "Bad request, no method");
@@ -32,17 +41,25 @@ public class HTTPParser {
             throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "Bad request, no URI");
         }
 
-        parseHeaders(inputStream, request);
-        parseBody(inputStream, request);
+        parseHeaders(inputStream, request, istreamBytes);
+        parseBody(inputStream, request, istreamBytes);
+
+        byte[] bytes = new byte[istreamBytes.size()];
+        for(int i = 0; i < istreamBytes.size(); i++){
+            bytes[i] = istreamBytes.get(i);
+        }
+
+        request.rawInput = bytes;
+
         return request;
     }
 
-    private void parseLine(InputStream inputStream, HTTPRequest request) throws IOException, HTTPParsingException {
+    private void parseLine(InputStream inputStream, HTTPRequest request, ArrayList<Byte> bytes) throws IOException, HTTPParsingException {
         int _byte;
         StringBuilder stringBuilder = new StringBuilder();
         boolean parsedMethod = false;
         try {
-            while ((_byte = inputStream.read()) >= 0) {
+            while ((_byte = readByte(inputStream, bytes)) >= 0) {
                 if(stringBuilder.length() > maxSectionLength){
                     throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_413_REQUEST_TOO_LARGE, "Request too large, line section too long");
                 }
@@ -71,11 +88,11 @@ public class HTTPParser {
         }
     }
 
-    private void parseHeaders(InputStream inputStream, HTTPRequest request) throws HTTPParsingException, IOException {
+    private void parseHeaders(InputStream inputStream, HTTPRequest request, ArrayList<Byte> istreamBytes) throws HTTPParsingException, IOException {
         try{
             int _byte;
             StringBuilder stringBuilder = new StringBuilder();
-            while((_byte = inputStream.read()) >= 0){
+            while((_byte = readByte(inputStream, istreamBytes)) >= 0){
                 if(stringBuilder.length() > maxSectionLength){
                     throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_413_REQUEST_TOO_LARGE, "Header line too long");
                 }
@@ -116,14 +133,14 @@ public class HTTPParser {
         return null;
     }
 
-    private void parseBody(InputStream inputStream, HTTPRequest request) throws HTTPParsingException {
+    private void parseBody(InputStream inputStream, HTTPRequest request, ArrayList<Byte> istreamBytes) throws HTTPParsingException {
         String contentLength = request.getHeader(HTTPHeaderType.Content_Length);
         try{
             int bytes = Integer.parseInt(contentLength);
             int _byte;
             StringBuilder stringBuilder = new StringBuilder();
             for(int i = 0; i < bytes; i++){
-                _byte = inputStream.read();
+                _byte = readByte(inputStream, istreamBytes);
 
                 if(stringBuilder.length() > maxBodyLength){
                     throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_413_REQUEST_TOO_LARGE, "body length exceeded 1 MB");

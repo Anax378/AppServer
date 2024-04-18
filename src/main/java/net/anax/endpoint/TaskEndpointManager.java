@@ -2,6 +2,7 @@ package net.anax.endpoint;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.database.Authorization;
+import net.anax.logging.Logger;
 import net.anax.util.JsonUtilities;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -14,7 +15,7 @@ public class TaskEndpointManager {
         this.connection = connection;
     }
 
-    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth) throws EndpointFailedException {
+    public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth, long traceId) throws EndpointFailedException {
         switch (endpoint){
             case("getTask") -> {
                 if(!JsonUtilities.validateKeys(new String[]{"taskId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not provided", EndpointFailedException.Reason.DataNotFound);}
@@ -67,6 +68,7 @@ public class TaskEndpointManager {
                 if(!JsonUtilities.validateKeys(new String[]{"taskId", "userId", "isComplete"}, new Class<?>[]{Long.class, Long.class, Boolean.class}, data)){throw new EndpointFailedException("necessary data not provided", EndpointFailedException.Reason.DataNotFound);}
                 return setCompleteness((int)(long)data.get("userId"), (int)(long)data.get("taskId"), (boolean)data.get("isComplete"), auth);
             }
+            default -> Logger.log("could not find ednpoint [" + endpoint + "] in task", traceId);
         }
         return null;
     }
