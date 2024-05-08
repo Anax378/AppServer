@@ -22,6 +22,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Scanner;
 
@@ -29,18 +30,21 @@ public class Main {
 
     private static int port;
     public static KeyManager keyManager;
+    public static boolean printExceptionsOnInstantiation = false;
+
     public static void main(String[] args) throws IOException, ParseException {
-        EndpointFailedException.doPrintStacktrace = true;
-        HTTPParsingException.doPrintStacktrace = true;
+        EndpointFailedException.doPrintStacktrace = printExceptionsOnInstantiation;
+        HTTPParsingException.doPrintStacktrace = printExceptionsOnInstantiation;
         System.out.print("Hmac Token Key Decryption password: ");
         Scanner scanner = new Scanner(System.in);
         String password = scanner.nextLine();
         try {
-            keyManager = new KeyManager(password);
+            keyManager = new KeyManager(password, "password"); //TODO: ask user for RSA key password
         } catch (Exception e) {
             e.printStackTrace();
             return;
         }
+        Logger.log("RSA decryptedKey: " + Arrays.toString(keyManager.getRSAPrivateTrafficKey().getKeyData()), -1);
 
         JSONObject config = (JSONObject)new JSONParser().parse(new FileReader("config.json"));
         port = ((Long)config.get("port")).intValue();

@@ -8,6 +8,7 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -22,12 +23,12 @@ import java.util.Base64;
 public class KeyManager {
     private static final int DerrivedKeyLengthBits = 256;
     private static final int ITERATIONS = 10000;
-    private final String password;
 
     private HMACSHA256Key hmacsha256Key;
-    public KeyManager(String password) throws IOException, ParseException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeySpecException, BadPaddingException, InvalidKeyException {
-        this.password = new String(password);
-        this.hmacsha256Key = new HMACSHA256Key(decryptBase64StringAES(password, getBase64EncryptedTokenKey()));
+    private RSAPrivateKey rsaPrivateKey;
+    public KeyManager(String HMACSHA256KeyPassword, String RSAPrivateKeyPassword) throws IOException, ParseException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, InvalidKeySpecException, BadPaddingException, InvalidKeyException {
+        this.hmacsha256Key = new HMACSHA256Key(decryptBase64StringAES(HMACSHA256KeyPassword, getBase64EncryptedTokenKey()));
+        this.rsaPrivateKey = new RSAPrivateKey(decryptBase64StringAES(RSAPrivateKeyPassword, getBase64EncryptedTrafficPrivateKey()));
     }
     private byte[] decryptBase64StringAES(String password, String base64String) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
         byte[] bytes = Base64.getDecoder().decode(base64String);
@@ -62,6 +63,10 @@ public class KeyManager {
         return digest.digest(password.getBytes(StandardCharsets.UTF_8));
     }
 
+    private String getBase64EncryptedTrafficPrivateKey() throws IOException, ParseException {
+        JSONObject privateConfig = (JSONObject) new JSONParser().parse(new FileReader("privateConfig.json"));
+        return (String) privateConfig.get("encryptedTrafficRSAPrivateKey");
+    }
     private String getBase64EncryptedTokenKey() throws IOException, ParseException {
         JSONObject privateConfig = (JSONObject) new JSONParser().parse(new FileReader("privateConfig.json"));
         return (String)privateConfig.get("encryptedTokenHMACSHA256Key");
@@ -69,5 +74,8 @@ public class KeyManager {
 
     public HMACSHA256Key getHMACSHA256TokenKey() {
         return hmacsha256Key;
+    }
+    public RSAPrivateKey getRSAPrivateTrafficKey(){
+        return this.rsaPrivateKey;
     }
 }

@@ -10,7 +10,12 @@ public class StringUtilities {
         }catch (NumberFormatException e){
             return false;
         }
-    };
+    }
+    public static boolean isBoolean(String bool){
+        if(bool == null){return false;}
+        if(bool.equalsIgnoreCase("true") || bool.equalsIgnoreCase("false")){return true;}
+        return false;
+    }
     public static boolean isLong(String string){
         try{
             Long.parseLong(string);

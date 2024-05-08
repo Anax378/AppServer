@@ -1,5 +1,7 @@
 package net.anax.http;
 
+import net.anax.logging.Logger;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
@@ -116,7 +118,7 @@ public class HTTPParser {
     private void parseHttpHeader(String headerLine, HTTPRequest request) throws HTTPParsingException {
         String[] halves = headerLine.split(": ");
         if(halves.length != 2){
-            throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "invalid header");
+            throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "invalid header: " + headerLine);
         }
         HTTPHeaderType type = getHeaderType(halves[0]);
         if(type != null){
@@ -151,9 +153,11 @@ public class HTTPParser {
                     break;
                 }
             }
+            Logger.log("setting request body with: " + stringBuilder.toString(), -2);
             request.setBody(stringBuilder.toString());
 
         }catch (NumberFormatException e){
+            Logger.logException(e, -2);
             request.setBody("");
         } catch (IOException e) {
             throw new RuntimeException(e);

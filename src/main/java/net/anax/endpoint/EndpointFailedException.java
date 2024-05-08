@@ -7,15 +7,26 @@ public class EndpointFailedException extends Exception {
         super(message);
         this.reason = reason;
         if(doPrintStacktrace){
+            System.out.println("instantiated exception: " + message);
             this.printStackTrace();
         }
+    }
+
+    public EndpointFailedException(String message, Reason reason, Exception cause){
+        super(message, cause);
+        this.reason = reason;
+        if(doPrintStacktrace){
+            this.printStackTrace();
+        }
+
     }
 
     public static enum Reason {
         AccessDenied,
         DataNotFound,
         UnexpectedError,
-        NothingChanged
+        NothingChanged,
+        InvalidRequest
         ;
     }
 }

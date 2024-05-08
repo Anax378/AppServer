@@ -9,8 +9,6 @@ public class HTTPRequest {
     private String body;
     byte[] rawInput;
 
-
-
     public String getBody() {
         return body;
     }

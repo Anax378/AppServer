@@ -2,6 +2,7 @@ package net.anax.thread;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.VirtualFileSystem.UserAuthorizationProfile;
+import net.anax.cryptography.AESKey;
 import net.anax.cryptography.KeyManager;
 import net.anax.database.Authorization;
 import net.anax.database.DatabaseAccessManager;
@@ -57,16 +58,27 @@ public class WorkerThread extends Thread{
             inputStream = socket.getInputStream();
             outputStream = socket.getOutputStream();
 
+            AESKey aesKey = null;
+            boolean sendThroughRSARelay = false;
 
             try {
-                HTTPRequest request = parser.parseRequest(inputStream);
-                Logger.info("request bytes: " + Arrays.toString(request.getRawInput()), traceId);
-                Logger.info("request: " + new String(request.getRawInput()), traceId);
+                HTTPRequest mainRequest = parser.parseRequest(inputStream);
+                Logger.info("request bytes: " + Arrays.toString(mainRequest.getRawInput()), traceId);
+                Logger.info("request: " + new String(mainRequest.getRawInput()), traceId);
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
                 String body = null;
 
                 try {
+                    HTTPRequest request;
+                    if(mainRequest.getURI().equals("/rsaRelay") || mainRequest.getURI().equalsIgnoreCase("/rsaRelay/")){
+                        HTTPWrapperRequest wrapperRequest = new HTTPWrapperRequest(mainRequest, parser, keyManager.getRSAPrivateTrafficKey());
+                        request = wrapperRequest.getUnderlyingRequest();
+                        sendThroughRSARelay = true;
+                        aesKey = wrapperRequest.getAESKey();
+                    }else{
+                        request = mainRequest;
+                    }
 
                     AuthorizationProfile auth = new UserAuthorizationProfile(-1);
                     String tokenString = request.getHeader(HTTPHeaderType.Authorization).replace("Bearer", "");
@@ -113,17 +125,37 @@ public class WorkerThread extends Thread{
                             Logger.log("returning 403, forbidden", traceId);
                         }
                         else if (e.reason == EndpointFailedException.Reason.UnexpectedError){
-                            response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_414_URI_TOO_LONG);
+                            response.setStatusCode(HTTPStatusCode.SERVER_ERROR_500_INTERNAL_SERVER_ERROR);
                             response.setBody("Unexpected Error");
-                            Logger.log("returning 414, unexpected error", traceId);
+                            Logger.log("returning 500, unexpected error", traceId);
                         }
                         e.printStackTrace();
                 }
 
-               response.writeOnStream(outputStream, traceId);
+                if(sendThroughRSARelay){
+                    HTTPWrapperResponse wrapperResponse = new HTTPWrapperResponse(response, aesKey);
+                    try {
+                        wrapperResponse.writeOnSteam(outputStream, traceId);
+                    } catch (EndpointFailedException e) {
+                        Logger.logException(e, traceId);
+                        new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST).writeOnStream(outputStream, traceId);
+                    }
+                }else{
+                    response.writeOnStream(outputStream, traceId);
+                }
             } catch (HTTPParsingException e) {
                 HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, e.getStatusCode());
-                response.writeOnStream(outputStream, traceId);
+                if(sendThroughRSARelay){
+                    HTTPWrapperResponse wrapperResponse = new HTTPWrapperResponse(response, aesKey);
+                    try {
+                        wrapperResponse.writeOnSteam(outputStream, traceId);
+                    } catch (EndpointFailedException ex) {
+                        Logger.logException(ex, traceId);
+                        new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST).writeOnStream(outputStream, traceId);
+                    }
+                }else{
+                    response.writeOnStream(outputStream, traceId);
+                }
             }
 
 

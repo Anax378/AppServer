@@ -74,11 +74,12 @@ public class DatabaseAccessManager {
         JSONObject data = null;
 
         try {
+            Logger.log("payload: " + payload, traceId);
             data = (JSONObject) parser.parse(payload);
             return endpointManager.callEndpoint(URI, data, auth, traceId);
 
         } catch (ParseException e) {
-            throw new EndpointFailedException("could not parse payload to json", EndpointFailedException.Reason.UnexpectedError);
+            throw new EndpointFailedException("could not parse payload to json", EndpointFailedException.Reason.UnexpectedError, e);
         }catch (EndpointFailedException e){
             Logger.log(e.getMessage(), traceId);
             throw e;
