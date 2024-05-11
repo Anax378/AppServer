@@ -1,70 +1,57 @@
 package net.anax.http;
 
 import net.anax.logging.Logger;
+import net.anax.util.ByteUtilities;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class HTTPParser {
-    private static final int CR = 13; // Carriage return
-    private static final int LF = 10; // Line Feed
-    private static final int SP = 32; // Space
-    private static final int CL = 58; // Colon
-
-    private int maxSectionLength = 8050;
-    private int maxBodyLength = 1048576; // 1 MB worth of bytes
-
-    public int getMaxSectionLength() {
-        return maxSectionLength;
-    }
-
-    public void setMaxSectionLength(int maxSectionLength) {
-        this.maxSectionLength = maxSectionLength;
-    }
-
+    public static final int CR = 13; // Carriage return
+    public static final int LF = 10; // Line Feed
+    public static final int SP = 32; // Space
+    public static final int CL = 58; // Colon
     int readByte(InputStream istream, ArrayList<Byte> bytes) throws IOException {
         int _byte = istream.read();
         bytes.add((byte) _byte);
         return _byte;
     }
-    public HTTPRequest parseRequest(InputStream inputStream) throws IOException, HTTPParsingException {
-
-        HTTPRequest request = new HTTPRequest();
-
+    public HTTPRequest parseRequest(InputStream inputStream, long traceId) throws IOException, HTTPParsingException {
         ArrayList<Byte> istreamBytes = new ArrayList<>();
-        parseLine(inputStream, request, istreamBytes);
+        try {
+            HTTPRequest request = new HTTPRequest();
 
-        if(request.getMethod() == null){
-            throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "Bad request, no method");
+            parseLine(inputStream, request, istreamBytes, traceId);
+
+            if (request.getMethod() == null) {
+                throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "Bad request, no method");
+            }
+            if (request.getURI() == null) {
+                throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "Bad request, no URI");
+            }
+
+            parseHeaders(inputStream, request, istreamBytes, traceId);
+            parseBody(inputStream, request, istreamBytes, traceId);
+
+            request.rawInput = ByteUtilities.byteListToByteArray(istreamBytes);
+
+            return request;
+        }catch(IOException | HTTPParsingException e){
+            Logger.log("could not parse request, read bytes are: " + Arrays.toString(ByteUtilities.byteListToByteArray(istreamBytes)), traceId);
+            throw e;
         }
-        if(request.getURI() == null){
-            throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST, "Bad request, no URI");
-        }
-
-        parseHeaders(inputStream, request, istreamBytes);
-        parseBody(inputStream, request, istreamBytes);
-
-        byte[] bytes = new byte[istreamBytes.size()];
-        for(int i = 0; i < istreamBytes.size(); i++){
-            bytes[i] = istreamBytes.get(i);
-        }
-
-        request.rawInput = bytes;
-
-        return request;
     }
 
-    private void parseLine(InputStream inputStream, HTTPRequest request, ArrayList<Byte> bytes) throws IOException, HTTPParsingException {
+
+    private void parseLine(InputStream inputStream, HTTPRequest request, ArrayList<Byte> bytes, long traceId) throws IOException, HTTPParsingException {
         int _byte;
         StringBuilder stringBuilder = new StringBuilder();
         boolean parsedMethod = false;
         try {
             while ((_byte = readByte(inputStream, bytes)) >= 0) {
-                if(stringBuilder.length() > maxSectionLength){
-                    throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_413_REQUEST_TOO_LARGE, "Request too large, line section too long");
-                }
                 if (_byte == LF && !stringBuilder.isEmpty() && stringBuilder.charAt(stringBuilder.length() - 1) == CR) {
                     return;
                 }
@@ -90,14 +77,11 @@ public class HTTPParser {
         }
     }
 
-    private void parseHeaders(InputStream inputStream, HTTPRequest request, ArrayList<Byte> istreamBytes) throws HTTPParsingException, IOException {
+    private void parseHeaders(InputStream inputStream, HTTPRequest request, ArrayList<Byte> istreamBytes, long traceId) throws HTTPParsingException, IOException {
         try{
             int _byte;
             StringBuilder stringBuilder = new StringBuilder();
             while((_byte = readByte(inputStream, istreamBytes)) >= 0){
-                if(stringBuilder.length() > maxSectionLength){
-                    throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_413_REQUEST_TOO_LARGE, "Header line too long");
-                }
                 if(_byte == LF && !stringBuilder.isEmpty() && stringBuilder.charAt(stringBuilder.length()-1) == CR){
                     stringBuilder.deleteCharAt(stringBuilder.length()-1);
                     if(stringBuilder.isEmpty()){return;}
@@ -135,7 +119,7 @@ public class HTTPParser {
         return null;
     }
 
-    private void parseBody(InputStream inputStream, HTTPRequest request, ArrayList<Byte> istreamBytes) throws HTTPParsingException {
+    private void parseBody(InputStream inputStream, HTTPRequest request, ArrayList<Byte> istreamBytes, long traceId) throws HTTPParsingException {
         String contentLength = request.getHeader(HTTPHeaderType.Content_Length);
         try{
             int bytes = Integer.parseInt(contentLength);
@@ -144,16 +128,12 @@ public class HTTPParser {
             for(int i = 0; i < bytes; i++){
                 _byte = readByte(inputStream, istreamBytes);
 
-                if(stringBuilder.length() > maxBodyLength){
-                    throw new HTTPParsingException(HTTPStatusCode.CLIENT_ERROR_413_REQUEST_TOO_LARGE, "body length exceeded 1 MB");
-                }
                 if(_byte >= 0){
                     stringBuilder.append((char)_byte);
                 }else{
                     break;
                 }
             }
-            Logger.log("setting request body with: " + stringBuilder.toString(), -2);
             request.setBody(stringBuilder.toString());
 
         }catch (NumberFormatException e){
@@ -172,7 +152,7 @@ public class HTTPParser {
                 return method;
             }
         }
-        throw new HTTPParsingException(HTTPStatusCode.SERVER_ERROR_501_NOT_IMPLEMENTED, "not implemented method: " + name);
+        return HTTPMethod.UNKNOWN;
     };
 
 }

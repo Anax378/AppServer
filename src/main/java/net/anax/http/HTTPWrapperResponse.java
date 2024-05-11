@@ -3,6 +3,7 @@ package net.anax.http;
 import com.sun.net.httpserver.Headers;
 import net.anax.cryptography.AESKey;
 import net.anax.endpoint.EndpointFailedException;
+import net.anax.logging.Logger;
 import org.json.simple.JSONObject;
 
 import javax.crypto.BadPaddingException;
@@ -31,6 +32,8 @@ public class HTTPWrapperResponse {
         try {
 
             ByteArrayOutputStream captureStream = new ByteArrayOutputStream();
+
+            Logger.info("capturing underlying response outputStream", traceId);
             underlyingResponse.writeOnStream(captureStream, traceId);
             byte[] responseData = captureStream.toByteArray();
 
@@ -46,6 +49,8 @@ public class HTTPWrapperResponse {
 
             HTTPResponse wrapperResponse = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
             wrapperResponse.setBody(encodedResponse);
+
+            Logger.info("writing main response", traceId);
             wrapperResponse.writeOnStream(ostream, traceId);
 
         }catch (NoSuchPaddingException | IllegalBlockSizeException | NoSuchAlgorithmException | BadPaddingException | InvalidKeyException e) {

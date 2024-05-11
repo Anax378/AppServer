@@ -83,7 +83,8 @@ public class HTTPResponse {
             Logger.info("writing on outputStream: " + Arrays.toString(this.getData().getBytes(StandardCharsets.US_ASCII)), traceId);
             outputStream.write(this.getData().getBytes(StandardCharsets.US_ASCII));
         } catch (IOException e) {
-            e.printStackTrace();
+            Logger.error("IOException when writing on outputStream", traceId);
+            Logger.logException(e, traceId);
         }
     }
 }

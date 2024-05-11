@@ -44,7 +44,6 @@ public class Main {
             e.printStackTrace();
             return;
         }
-        Logger.log("RSA decryptedKey: " + Arrays.toString(keyManager.getRSAPrivateTrafficKey().getKeyData()), -1);
 
         JSONObject config = (JSONObject)new JSONParser().parse(new FileReader("config.json"));
         port = ((Long)config.get("port")).intValue();

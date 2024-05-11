@@ -3,7 +3,6 @@ package net.anax.http;
 import net.anax.cryptography.AESKey;
 import net.anax.cryptography.RSAPrivateKey;
 import net.anax.endpoint.EndpointFailedException;
-import net.anax.logging.Logger;
 import net.anax.util.JsonUtilities;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -33,20 +32,16 @@ public class HTTPWrapperRequest{
         this.rsaKey = key;
         this.wrapperRequest = wrapperRequest;
     }
-    public HTTPRequest getUnderlyingRequest() throws HTTPParsingException, EndpointFailedException {
+    public HTTPRequest getUnderlyingRequest(long traceId) throws HTTPParsingException, EndpointFailedException {
         if(underlyingRequest != null){return underlyingRequest;}
         try {
             byte[] encryptedData = Base64.getDecoder().decode(wrapperRequest.getBody());
-
-            Logger.log("encryptedData: " + Arrays.toString(encryptedData), -2);
 
             Cipher cipher = Cipher.getInstance("RSA");
             cipher.init(Cipher.DECRYPT_MODE, rsaKey.getKey());
             byte[] data = cipher.doFinal(encryptedData);
 
             JSONParser parser = new JSONParser();
-
-            Logger.log(Arrays.toString(data), -2);
 
             JSONObject cJson = (JSONObject) parser.parse(new String(data, StandardCharsets.US_ASCII));
 
@@ -56,9 +51,7 @@ public class HTTPWrapperRequest{
             byte[] aesKeyData = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "key", ex));
             this.aesKey = new AESKey(aesKeyData);
 
-            Logger.log("underlying request data: " + Arrays.toString(underlyingRequestData), -2);
-
-            underlyingRequest = httpParser.parseRequest(new ByteArrayInputStream(underlyingRequestData));
+            underlyingRequest = httpParser.parseRequest(new ByteArrayInputStream(underlyingRequestData), traceId);
             return underlyingRequest;
 
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException e){

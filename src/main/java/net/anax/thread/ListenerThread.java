@@ -22,7 +22,8 @@ public class ListenerThread extends Thread{
                 Socket socket = serverSocket.accept();
                 long traceId = Logger.generateTraceId();
                 WorkerThread workerThread = new WorkerThread(socket, keyManager, traceId);
-                Logger.log("accepted connection", traceId);
+
+                Logger.info("accepted connection", traceId);
                 workerThread.start();
             } catch (IOException e) {
                 throw new RuntimeException(e);

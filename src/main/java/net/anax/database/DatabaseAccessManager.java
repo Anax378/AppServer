@@ -37,13 +37,13 @@ public class DatabaseAccessManager {
             database_address = (String) config.get("database_address");
             database_password = (String) config.get("database_password");
         } catch (FileNotFoundException e) {
-            Logger.log("Could not find config file", 0);
+            Logger.error("Could not find config file", 0);
             throw new RuntimeException(e);
         } catch (IOException e) {
-            Logger.log("Cannot read config ", 0);
+            Logger.error("Cannot read config ", 0);
             throw new RuntimeException(e);
         } catch (ParseException e) {
-            Logger.log("Could not parse config file", 0);
+            Logger.error("Could not parse config file", 0);
         }
 
         try {
@@ -74,7 +74,6 @@ public class DatabaseAccessManager {
         JSONObject data = null;
 
         try {
-            Logger.log("payload: " + payload, traceId);
             data = (JSONObject) parser.parse(payload);
             return endpointManager.callEndpoint(URI, data, auth, traceId);
 

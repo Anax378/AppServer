@@ -4,28 +4,28 @@ import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.VirtualFileSystem.UserAuthorizationProfile;
 import net.anax.cryptography.AESKey;
 import net.anax.cryptography.KeyManager;
-import net.anax.database.Authorization;
 import net.anax.database.DatabaseAccessManager;
 import net.anax.endpoint.EndpointFailedException;
 import net.anax.http.*;
 import net.anax.logging.Logger;
 import net.anax.token.Claim;
 import net.anax.token.Token;
+import net.anax.util.ByteUtilities;
 import net.anax.util.StringUtilities;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class WorkerThread extends Thread{
-    private int timeOutTimeMillis = 10000;
+    int timeOutTimeMillis = 10_000;
     private HTTPParser parser = new HTTPParser();
     Socket socket;
     KeyManager keyManager;
     long traceId;
+    final long MAX_REQUEST_SIZE = 5 * 1024 * 1024; //5 MiB
 
     public int getTimeOutTimeMillis() {
         return timeOutTimeMillis;
@@ -46,134 +46,126 @@ public class WorkerThread extends Thread{
         InputStream inputStream = null;
         OutputStream outputStream = null;
 
-        DatabaseAccessManager.getInstance().setKeyManager(keyManager);
+        boolean useRSARelay = false;
+        AESKey aesKey = null;
+        HTTPResponse workingResponse = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
 
         try {
+            DatabaseAccessManager.getInstance().setKeyManager(keyManager);
+
             socket.setSoTimeout(getTimeOutTimeMillis());
-        } catch (SocketException e) {
-            Logger.error("could not set socket timeout", traceId);
-            throw new RuntimeException(e);
-        }
-        try {
             inputStream = socket.getInputStream();
             outputStream = socket.getOutputStream();
 
-            AESKey aesKey = null;
-            boolean sendThroughRSARelay = false;
+            HTTPRequest mainRequest = parser.parseRequest(inputStream, traceId);
 
-            try {
-                HTTPRequest mainRequest = parser.parseRequest(inputStream);
-                Logger.info("request bytes: " + Arrays.toString(mainRequest.getRawInput()), traceId);
-                Logger.info("request: " + new String(mainRequest.getRawInput()), traceId);
-                HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);
+            Logger.info("main request bytes: " + Arrays.toString(mainRequest.getRawInput()), traceId);
+            Logger.info("main request string interpretation: \n" + new String(mainRequest.getRawInput(), StandardCharsets.US_ASCII), traceId);
 
-                String body = null;
-
-                try {
-                    HTTPRequest request;
-                    if(mainRequest.getURI().equals("/rsaRelay") || mainRequest.getURI().equalsIgnoreCase("/rsaRelay/")){
-                        HTTPWrapperRequest wrapperRequest = new HTTPWrapperRequest(mainRequest, parser, keyManager.getRSAPrivateTrafficKey());
-                        request = wrapperRequest.getUnderlyingRequest();
-                        sendThroughRSARelay = true;
-                        aesKey = wrapperRequest.getAESKey();
-                    }else{
-                        request = mainRequest;
-                    }
-
-                    AuthorizationProfile auth = new UserAuthorizationProfile(-1);
-                    String tokenString = request.getHeader(HTTPHeaderType.Authorization).replace("Bearer", "");
-                    Token token = Token.parseToken(tokenString.trim());
-
-                    if(token != null){
-                        if(token.validateSignature(keyManager.getHMACSHA256TokenKey())){
-                            String expirationTime = token.getClaim(Claim.ExpirationTimestamp);
-                            if(StringUtilities.isLong(expirationTime)){
-                                if(Long.parseLong(expirationTime) > System.currentTimeMillis()){
-                                    String id = token.getClaim(Claim.Subject);
-                                    if(StringUtilities.isInteger(id)){
-                                        auth = new UserAuthorizationProfile(Integer.parseInt(id));
-                                        Logger.info("authorized token " + token, traceId);
-                                    }
-                                }else{Logger.log("expired token " + token, traceId);}
-                            }else{Logger.log("invalid data in token  " + token, traceId);}
-                        }else{Logger.log("could not verify token " + token, traceId);}
-                    }else{Logger.log("token is null", traceId);}
-
-                    body = DatabaseAccessManager.getInstance().handleRequest(request.getURI(), request.getBody(), auth, traceId);
-
-                    if(body == null){
-                        throw new EndpointFailedException("endpoint not found", EndpointFailedException.Reason.DataNotFound);
-                    }
-
-                    response.setBody(body);
-                    response.setStatusCode(HTTPStatusCode.OK_200);
-
-                }catch (EndpointFailedException e){
-                        if(e.reason == EndpointFailedException.Reason.DataNotFound){
-                            response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_404_NOT_FOUND);
-                            response.setBody("Data not found");
-                            Logger.log("returning 404, data not found", traceId);
-                        }
-                        else if(e.reason == EndpointFailedException.Reason.NothingChanged){
-                            response.setStatusCode(HTTPStatusCode.SERVER_ERROR_500_INTERNAL_SERVER_ERROR);
-                            response.setBody("Nothing changed");
-                            Logger.log("returning 500, nothing changed", traceId);
-                        }
-                        else if (e.reason == EndpointFailedException.Reason.AccessDenied){
-                            response.setStatusCode(HTTPStatusCode.CLIENT_ERROR_403_FORBIDDEN);
-                            response.setBody("Access Denied");
-                            Logger.log("returning 403, forbidden", traceId);
-                        }
-                        else if (e.reason == EndpointFailedException.Reason.UnexpectedError){
-                            response.setStatusCode(HTTPStatusCode.SERVER_ERROR_500_INTERNAL_SERVER_ERROR);
-                            response.setBody("Unexpected Error");
-                            Logger.log("returning 500, unexpected error", traceId);
-                        }
-                        e.printStackTrace();
-                }
-
-                if(sendThroughRSARelay){
-                    HTTPWrapperResponse wrapperResponse = new HTTPWrapperResponse(response, aesKey);
-                    try {
-                        wrapperResponse.writeOnSteam(outputStream, traceId);
-                    } catch (EndpointFailedException e) {
-                        Logger.logException(e, traceId);
-                        new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST).writeOnStream(outputStream, traceId);
-                    }
-                }else{
-                    response.writeOnStream(outputStream, traceId);
-                }
-            } catch (HTTPParsingException e) {
-                HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, e.getStatusCode());
-                if(sendThroughRSARelay){
-                    HTTPWrapperResponse wrapperResponse = new HTTPWrapperResponse(response, aesKey);
-                    try {
-                        wrapperResponse.writeOnSteam(outputStream, traceId);
-                    } catch (EndpointFailedException ex) {
-                        Logger.logException(ex, traceId);
-                        new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST).writeOnStream(outputStream, traceId);
-                    }
-                }else{
-                    response.writeOnStream(outputStream, traceId);
-                }
+            if(mainRequest.getMethod() == HTTPMethod.UNKNOWN){
+                throw new HTTPParsingException(HTTPStatusCode.SERVER_ERROR_501_NOT_IMPLEMENTED, "method not recognized");
             }
 
+            HTTPRequest workingRequest;
+            if(mainRequest.getURI().equals("/rsaRelay") || mainRequest.getURI().equals("/rsaRelay/")){
+                Logger.info("routing request through rsaRelay", traceId);
 
+                HTTPWrapperRequest wrapperRequest = new HTTPWrapperRequest(mainRequest, parser, keyManager.getRSAPrivateTrafficKey());
+                workingRequest = wrapperRequest.getUnderlyingRequest(traceId);
+
+                Logger.info("underlying request bytes: " + Arrays.toString(workingRequest.getRawInput()), traceId);
+                Logger.info("underlying request string interpretation: \n" + new String(workingRequest.getRawInput(), StandardCharsets.US_ASCII), traceId);
+
+                useRSARelay = true;
+                aesKey = wrapperRequest.getAESKey();
+            }else{
+                workingRequest = mainRequest;
+            }
+
+            AuthorizationProfile auth = new UserAuthorizationProfile(-1);
+            String tokenString = workingRequest.getHeader(HTTPHeaderType.Authorization).replace("Bearer", "");
+            Token token = Token.parseToken(tokenString);
+
+            authorization: {
+                if(token == null){Logger.log("token is null: " + tokenString, traceId); break authorization;}
+                if(!token.validateSignature(keyManager.getHMACSHA256TokenKey())){Logger.log("could not authorize token: " + tokenString, traceId); break authorization;}
+
+                String expirationTimeString = token.getClaim(Claim.ExpirationTimestamp);
+                if(!StringUtilities.isLong(expirationTimeString)){Logger.log("invalid expiration time in token: " + tokenString, traceId); break authorization;}
+
+                long expirationTime = Long.parseLong(expirationTimeString);
+                if(expirationTime < System.currentTimeMillis()){Logger.log("expired token: " + tokenString, traceId); break authorization;}
+
+                String idString = token.getClaim(Claim.Subject);
+                if(!StringUtilities.isInteger(idString)){Logger.log("invalid id in token: " + tokenString, traceId); break authorization;}
+                int id = Integer.parseInt(idString);
+
+                Logger.info("successfully identified user with the id " + id, traceId);
+                auth = new UserAuthorizationProfile(id);
+
+            }
+
+            String responseBody = DatabaseAccessManager.getInstance().handleRequest(workingRequest.getURI(), workingRequest.getBody(), auth, traceId);
+
+            if(responseBody == null){
+                throw new EndpointFailedException("endpoint not found", EndpointFailedException.Reason.DataNotFound);
+            }
+            workingResponse.setBody(responseBody);
+        } catch (SocketException e) {
+            Logger.error("could not set socket timeout", traceId);
+            Logger.logException(e, traceId);
+
+            closeStreams(inputStream, outputStream);
+            throw new RuntimeException(e);
         } catch (IOException e) {
             Logger.error("IO Exception", traceId);
+            Logger.logException(e, traceId);
+
+            closeStreams(inputStream, outputStream);
             throw new RuntimeException(e);
-        }finally {
-            try {
-                if(outputStream != null){
-                    outputStream.close();
-                }
-                if(inputStream != null){
-                    inputStream.close();
-                }
-                socket.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        } catch (HTTPParsingException e) {
+            workingResponse.setStatusCode(e.getStatusCode());
+            Logger.error("parsing exception", traceId);
+            Logger.logException(e, traceId);
+
+        } catch (EndpointFailedException e) {
+            workingResponse.setStatusCode(e.reason.statusCode);
+            Logger.error("enpoint failed: " + e.reason.message, traceId);
+            Logger.logException(e, traceId);
+
+        }
+
+        try {
+            if(useRSARelay){
+                HTTPWrapperResponse wrapperResponse = new HTTPWrapperResponse(workingResponse, aesKey);
+
+                wrapperResponse.writeOnSteam(outputStream, traceId);
+            }else{
+                workingResponse.writeOnStream(outputStream, traceId);
             }
+        } catch (EndpointFailedException e) {
+            HTTPResponse response = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.CLIENT_ERROR_400_BAD_REQUEST);
+            response.writeOnStream(outputStream, traceId);
+
+        } finally {
+            closeStreams(inputStream, outputStream);
+        }
+
+    }
+
+    public void closeStreams(InputStream inputStream, OutputStream outputStream){
+        try {
+            if(outputStream != null){
+                outputStream.close();
+            }
+            if(inputStream != null){
+                inputStream.close();
+            }
+            socket.close();
+        } catch (IOException e) {
+            Logger.logException(e, traceId);
+            throw new RuntimeException(e);
         }
     }
+
 }
