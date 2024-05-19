@@ -23,7 +23,7 @@ public class ListenerThread extends Thread{
                 long traceId = Logger.generateTraceId();
                 WorkerThread workerThread = new WorkerThread(socket, keyManager, traceId);
 
-                Logger.info("accepted connection", traceId);
+                Logger.info(Logger.colorIfSupport("Accepted connection from: ", Logger.AnsiEscapeCode.Green) + socket.getInetAddress().getHostAddress(), traceId);
                 workerThread.start();
             } catch (IOException e) {
                 throw new RuntimeException(e);
