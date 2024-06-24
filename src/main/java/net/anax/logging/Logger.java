@@ -65,9 +65,9 @@ public class Logger {
         return new AdvanceAnsiEscapeCode((byte)traceId);
     }
     public static void logException(Exception e, long traceId){
-        System.out.println(addDetail("EXCEPTION", e.getMessage(), traceId) + ">");
-        System.out.println(colorIfSupport(getPrintedStackTrace(e), exceptionPrintColor));
-        System.out.println("< [Exception end]");
+        putLn(addDetail("EXCEPTION", e.getMessage(), traceId) + ">");
+        putLn(colorIfSupport(getPrintedStackTrace(e), exceptionPrintColor));
+        putLn("< [Exception end]");
     }
     public static IAnsiPainter getAnsiColorForLogType(String logType){
         switch (logType){
