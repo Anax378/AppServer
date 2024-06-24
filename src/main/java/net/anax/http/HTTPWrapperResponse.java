@@ -41,7 +41,7 @@ public class HTTPWrapperResponse {
             JSONObject responseJson = new JSONObject();
             responseJson.put("response", base64EncodedResponse);
 
-            Cipher cipher = Cipher.getInstance("AES");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, key.getkey());
 
             byte[] data = cipher.doFinal(responseJson.toJSONString().getBytes(StandardCharsets.US_ASCII));

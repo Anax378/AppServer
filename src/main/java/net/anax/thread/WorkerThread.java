@@ -133,6 +133,10 @@ public class WorkerThread extends Thread{
             Logger.error("enpoint failed: " + e.reason.message, traceId);
             Logger.logException(e, traceId);
 
+        } catch (Exception e){
+            workingResponse.setStatusCode(HTTPStatusCode.SERVER_ERROR_500_INTERNAL_SERVER_ERROR);
+            Logger.error("caught exception", traceId);
+            Logger.logException(e, traceId);
         }
 
         try {

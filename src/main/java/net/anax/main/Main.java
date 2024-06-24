@@ -6,6 +6,7 @@ import net.anax.http.HTTPParsingException;
 import net.anax.logging.Logger;
 import net.anax.thread.ListenerThread;
 import net.anax.thread.WorkerThread;
+import net.anax.util.JsonUtilities;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -13,10 +14,7 @@ import org.json.simple.parser.ParseException;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import java.io.ByteArrayOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -33,11 +31,20 @@ public class Main {
     public static boolean printExceptionsOnInstantiation = false;
 
     public static void main(String[] args) throws IOException, ParseException {
+
         EndpointFailedException.doPrintStacktrace = printExceptionsOnInstantiation;
         HTTPParsingException.doPrintStacktrace = printExceptionsOnInstantiation;
+
+        JSONObject config = (JSONObject)new JSONParser().parse(new FileReader("config.json"));
+        port = ((Long)config.get("port")).intValue();
+        String logPath = JsonUtilities.extractString(config, "log_path", new RuntimeException("could not find log_path in config"));
+
+        Logger.printStreams = new PrintStream[]{System.out, new PrintStream(new FileOutputStream(logPath, true))};
+
         System.out.print("Hmac Token Key Decryption password: ");
         Scanner scanner = new Scanner(System.in);
         String password = scanner.nextLine();
+
         try {
             keyManager = new KeyManager(password, "password"); //TODO: ask user for RSA key password
         } catch (Exception e) {
@@ -45,8 +52,6 @@ public class Main {
             return;
         }
 
-        JSONObject config = (JSONObject)new JSONParser().parse(new FileReader("config.json"));
-        port = ((Long)config.get("port")).intValue();
         try {
             ServerSocket serverSocket = new ServerSocket(port);
             ListenerThread listenerThread = new ListenerThread(serverSocket, keyManager);

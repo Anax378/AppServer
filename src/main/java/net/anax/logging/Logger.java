@@ -1,7 +1,9 @@
 package net.anax.logging;
 
+import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
@@ -11,27 +13,32 @@ public class Logger {
     public static final IAnsiPainter logPrefixPrintColor = AnsiEscapeCode.Black;
     public static boolean useAnsi = true;
     public static int longestLogPrefixLength = 0;
+    public static PrintStream[] printStreams = new PrintStream[]{System.out};
 
     //used to Log things that are out of the ordinary
     public static void log(String message, long traceId){
-        System.out.println(addDetail("LOG", message, traceId));
+        putLn(addDetail("LOG", message, traceId));
     }
     //used to Log things that are normal and expected
     public static void info(String message, long traceId){
-        System.out.println(addDetail("INFO", message, traceId));
+        putLn(addDetail("INFO", message, traceId));
     }
     //used to log things that should not happen even with an invalid request
     public static void error(String message, long traceId){
-        System.out.println(addDetail("ERROR", message, traceId));
+        putLn(addDetail("ERROR", message, traceId));
     }
     //debug statements
     public static void debug(String message, long traceId){
-        System.out.println(addDetail("DEBUG", message, traceId));
+        putLn(addDetail("DEBUG", message, traceId));
     }
     public static void custom(String type, String message, long traceId){
-        System.out.println(addDetail(type, message, traceId));
+        putLn(addDetail(type, message, traceId));
     }
-
+    private static void putLn(String message){
+        for(PrintStream stream : printStreams){
+            stream.println(message);
+        }
+    }
     private static String addDetail(String type, String message, long traceId){
 
         String callerInfo = "not found";
