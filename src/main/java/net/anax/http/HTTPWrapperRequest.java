@@ -37,19 +37,21 @@ public class HTTPWrapperRequest{
         try {
             byte[] encryptedData = Base64.getDecoder().decode(wrapperRequest.getBody());
 
-            Cipher cipher = Cipher.getInstance("RSA");
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.DECRYPT_MODE, rsaKey.getKey());
+
             byte[] data = cipher.doFinal(encryptedData);
 
             JSONParser parser = new JSONParser();
 
             JSONObject cJson = (JSONObject) parser.parse(new String(data, StandardCharsets.US_ASCII));
-
             EndpointFailedException ex = new EndpointFailedException("could not find necessary data in cJson", EndpointFailedException.Reason.InvalidRequest);
 
             byte[] underlyingRequestData = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "request", ex));
             byte[] aesKeyData = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "key", ex));
-            this.aesKey = new AESKey(aesKeyData);
+            byte[] iv = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "iv", ex));
+
+            this.aesKey = new AESKey(aesKeyData, iv);
 
             underlyingRequest = httpParser.parseRequest(new ByteArrayInputStream(underlyingRequestData), traceId);
             return underlyingRequest;

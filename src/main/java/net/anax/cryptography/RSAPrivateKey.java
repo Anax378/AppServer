@@ -5,6 +5,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Arrays;
 
 public class RSAPrivateKey {
     private byte[] keyData;
@@ -13,6 +14,7 @@ public class RSAPrivateKey {
         this.keyData = keyData;
         KeyFactory kf = KeyFactory.getInstance("RSA");
         this.key = kf.generatePrivate(new PKCS8EncodedKeySpec(keyData));
+
     }
 
     public byte[] getKeyData(){
