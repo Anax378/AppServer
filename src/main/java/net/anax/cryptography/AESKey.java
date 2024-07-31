@@ -7,7 +7,7 @@ public class AESKey {
     byte[] keyData;
     byte[] iv;
     Key key;
-    public AESKey(byte[] keyData,byte[] iv){
+    public AESKey(byte[] keyData, byte[] iv){
         this.keyData = keyData;
         this.iv = iv;
         key = new SecretKeySpec(keyData, "AES");

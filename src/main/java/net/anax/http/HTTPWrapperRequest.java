@@ -3,6 +3,7 @@ package net.anax.http;
 import net.anax.cryptography.AESKey;
 import net.anax.cryptography.RSAPrivateKey;
 import net.anax.endpoint.EndpointFailedException;
+import net.anax.util.CryptoUtilities;
 import net.anax.util.JsonUtilities;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -15,6 +16,7 @@ import javax.crypto.NoSuchPaddingException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -35,33 +37,29 @@ public class HTTPWrapperRequest{
     public HTTPRequest getUnderlyingRequest(long traceId) throws HTTPParsingException, EndpointFailedException {
         if(underlyingRequest != null){return underlyingRequest;}
         try {
-            byte[] encryptedData = Base64.getDecoder().decode(wrapperRequest.getBody());
-
-            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipher.init(Cipher.DECRYPT_MODE, rsaKey.getKey());
-
-            byte[] data = cipher.doFinal(encryptedData);
-
             JSONParser parser = new JSONParser();
+            JSONObject data = (JSONObject) parser.parse(underlyingRequest.getBody());
 
-            JSONObject cJson = (JSONObject) parser.parse(new String(data, StandardCharsets.US_ASCII));
-            EndpointFailedException ex = new EndpointFailedException("could not find necessary data in cJson", EndpointFailedException.Reason.InvalidRequest);
+            byte[] encryptedAesKey = Base64.getDecoder().decode(JsonUtilities.extractString(data, "encrypted_key", new EndpointFailedException("insufficient data in json", EndpointFailedException.Reason.InvalidRequest)));
+            byte[] encryptedIv = Base64.getDecoder().decode(JsonUtilities.extractString(data, "encrypted_iv", new EndpointFailedException("insufficient data in json", EndpointFailedException.Reason.InvalidRequest)));
 
-            byte[] underlyingRequestData = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "request", ex));
-            byte[] aesKeyData = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "key", ex));
-            byte[] iv = Base64.getDecoder().decode(JsonUtilities.extractString(cJson, "iv", ex));
+            byte[] aesKeyData = CryptoUtilities.decryptWithRSA(encryptedAesKey, rsaKey.getKey());
+            byte[] aesIv = CryptoUtilities.decryptWithRSA(encryptedIv, rsaKey.getKey());
 
-            this.aesKey = new AESKey(aesKeyData, iv);
+            this.aesKey = new AESKey(aesKeyData, aesIv);
 
-            underlyingRequest = httpParser.parseRequest(new ByteArrayInputStream(underlyingRequestData), traceId);
+            byte[] encryptedRequestData = Base64.getDecoder().decode(JsonUtilities.extractString(data, "encrypted_request", new EndpointFailedException("insufficient data in json", EndpointFailedException.Reason.InvalidRequest)));
+            byte[] requestData = CryptoUtilities.decryptWithAES(encryptedRequestData, this.aesKey.getkey(), this.aesKey.getIv());
+
+            underlyingRequest = httpParser.parseRequest(new ByteArrayInputStream(requestData), traceId);
             return underlyingRequest;
 
-        } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException e){
+        } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException | InvalidAlgorithmParameterException e){
             throw new EndpointFailedException("could not decrypt the underlying request", EndpointFailedException.Reason.InvalidRequest, e);
         } catch (IOException e){
             throw new EndpointFailedException("connection failed", EndpointFailedException.Reason.UnexpectedError, e);
         } catch (ParseException e) {
-            throw new RuntimeException(e);
+            throw new EndpointFailedException("could not parse json", EndpointFailedException.Reason.InvalidRequest, e);
         }
     }
     public AESKey getAESKey(){
