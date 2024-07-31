@@ -209,7 +209,7 @@ public class GroupEndpointManager {
         if(!auth.isAdmin() && auth.getId() != authorUserId){throw new EndpointFailedException("Access Denied",EndpointFailedException.Reason.AccessDenied);}
         try {
             Random random = new Random();
-            byte[] accessCodeRandBytes = new byte[10];
+            byte[] accessCodeRandBytes = new byte[5];
             random.nextBytes(accessCodeRandBytes);
             String accessCodeRand = ByteUtilities.toHexString(accessCodeRandBytes);
 
@@ -233,7 +233,7 @@ public class GroupEndpointManager {
             return data.toJSONString();
 
         } catch (SQLException e) {
-            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError, e);
         }
     }
 
