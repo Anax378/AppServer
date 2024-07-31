@@ -1,14 +1,20 @@
 package net.anax.endpoint;
 
+import com.mysql.cj.x.protobuf.MysqlxPrepare;
 import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.database.Authorization;
 import net.anax.logging.Logger;
+import net.anax.util.ByteUtilities;
 import net.anax.util.DatabaseUtilities;
 import net.anax.util.JsonUtilities;
+import net.anax.util.StringUtilities;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 import java.sql.*;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.Random;
 
 public class GroupEndpointManager {
     Connection connection;
@@ -46,6 +52,11 @@ public class GroupEndpointManager {
                 if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
                 return removeTreasurer((int)(long) data.get("groupId"), auth);
             }
+            case("rerollAccessCode") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{String.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                return rerollAccessCode((int)(long) data.get("groupId"), auth);
+
+            }
             default -> {Logger.log("could not find endpoint [" + endpoint + "] in grouop", traceId);}
         }
         return null;
@@ -76,12 +87,23 @@ public class GroupEndpointManager {
             while(taskResult.next()){
                 taskIds.add(taskResult.getInt("id"));
             }
+
+            String accessCodeRand = DatabaseUtilities.queryString("access_code_rand", "group_table", groupId, connection);
+
+            if(accessCodeRand == null){
+                throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
+            }
+
+            byte[] accessCodeRandBytes = ByteUtilities.fillToLen(ByteUtilities.fromHexString(accessCodeRand), 5, (byte) 0);
+            String accessCode = getAccessCode(groupId, accessCodeRandBytes);
+
             JSONObject data = new JSONObject();
             data.put("name", name);
             data.put("treasurerUserId", treasurerUserId);
             data.put("userIds", userIds);
             data.put("taskIds", taskIds);
             data.put("admin_id", adminUserId);
+            data.put("accessCode", accessCode);
 
             return data.toJSONString();
 
@@ -160,13 +182,42 @@ public class GroupEndpointManager {
         }
     }
 
+    public String rerollAccessCode(int groupId, AuthorizationProfile auth) throws EndpointFailedException {
+        if (!auth.isAdmin() && !Authorization.isAdminInGroup(auth, groupId, connection)){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+        try{
+            Random random = new Random();
+            byte[] accessCodeRand = new byte[5];
+            random.nextBytes(accessCodeRand);
 
+            String accessCodeRandHex = ByteUtilities.toHexString(accessCodeRand);
+            PreparedStatement statement = connection.prepareStatement("UPDATE group_table SET access_code_rand=? WHERE id=?;");
+            statement.setString(1, accessCodeRandHex);
+            statement.setInt(2, groupId);
+            int affected = statement.executeUpdate();
+
+            if(affected == 0){
+                throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);
+            }
+            String accessCode = getAccessCode(groupId, accessCodeRand);
+            return "{\"newAccessCode\":\"" + accessCode + "\"}";
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError, e);
+        }
+
+    }
     public String createGroup(String name, int authorUserId, AuthorizationProfile auth) throws EndpointFailedException {
         if(!auth.isAdmin() && auth.getId() != authorUserId){throw new EndpointFailedException("Access Denied",EndpointFailedException.Reason.AccessDenied);}
         try {
-            PreparedStatement statement = connection.prepareStatement("INSERT INTO group_table (name, admin_id) VALUES (?, ?);", Statement.RETURN_GENERATED_KEYS);
+            Random random = new Random();
+            byte[] accessCodeRandBytes = new byte[10];
+            random.nextBytes(accessCodeRandBytes);
+            String accessCodeRand = ByteUtilities.toHexString(accessCodeRandBytes);
+
+            PreparedStatement statement = connection.prepareStatement("INSERT INTO group_table (name, admin_id, access_code_rand) VALUES (?, ?, ?);", Statement.RETURN_GENERATED_KEYS);
             statement.setString(1, name);
             statement.setInt(2, authorUserId);
+            statement.setString(3, accessCodeRand);
             statement.executeUpdate();
             ResultSet result = statement.getGeneratedKeys();
             if(!result.next()){throw new EndpointFailedException("no keys generated, unable to create group", EndpointFailedException.Reason.UnexpectedError);}
@@ -201,6 +252,21 @@ public class GroupEndpointManager {
         } catch (SQLException e) {
             throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError);
         }
+    }
+
+    int getIdFromAccessCode(String accessCode){
+        byte[] accessCodeBytes = StringUtilities.fromAccessCodeFormat(accessCode);
+        byte[] idBytes = new byte[4];
+        System.arraycopy(accessCodeBytes, 5, idBytes, 0, 4);
+        return ByteUtilities.bytesToInt(idBytes);
+
+    }
+
+    String getAccessCode(int id, byte[] accessCodeRand){
+        byte[] idBytes = ByteUtilities.intToBytes(id);
+        byte[] accessCodeBytes = ByteUtilities.concatenateByteArrays(accessCodeRand, idBytes);
+        return StringUtilities.toAccessCodeFormat(accessCodeBytes);
+
     }
 
 }

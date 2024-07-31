@@ -2,6 +2,8 @@ package net.anax.util;
 
 import org.json.simple.JSONObject;
 
+import java.util.Base64;
+
 public class StringUtilities {
     public static boolean isInteger(String string){
         try{
@@ -29,6 +31,15 @@ public class StringUtilities {
         JSONObject json = new JSONObject();
         json.put(key, value);
         return json.toJSONString();
+    }
+
+    public static String toAccessCodeFormat(byte[] bytes){
+        return Base64.getEncoder().encodeToString(bytes).replace("/", "!").replace("+", "?");
+    }
+
+    public static byte[] fromAccessCodeFormat(String string){
+        return Base64.getDecoder().decode(string.replace("!", "/").replace("?", "+"));
+
     }
 
 
