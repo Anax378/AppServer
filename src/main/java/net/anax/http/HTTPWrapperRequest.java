@@ -38,7 +38,7 @@ public class HTTPWrapperRequest{
         if(underlyingRequest != null){return underlyingRequest;}
         try {
             JSONParser parser = new JSONParser();
-            JSONObject data = (JSONObject) parser.parse(underlyingRequest.getBody());
+            JSONObject data = (JSONObject) parser.parse(wrapperRequest.getBody());
 
             byte[] encryptedAesKey = Base64.getDecoder().decode(JsonUtilities.extractString(data, "encrypted_key", new EndpointFailedException("insufficient data in json", EndpointFailedException.Reason.InvalidRequest)));
             byte[] encryptedIv = Base64.getDecoder().decode(JsonUtilities.extractString(data, "encrypted_iv", new EndpointFailedException("insufficient data in json", EndpointFailedException.Reason.InvalidRequest)));
