@@ -62,7 +62,11 @@ public class UserEndpointManager {
                 if(!JsonUtilities.validateKeys(new String[]{"username", "password"}, new Class[]{String.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
                 return login((String) data.get("username"), (String)data.get("password"), DatabaseAccessManager.getInstance().getKeyManager());
             }
-            default -> {Logger.log("could not find a enpoint [" + endpoint + "] in user", traceId);}
+            case("joinWithAccessCode") -> {
+                if(!JsonUtilities.validateKeys(new String[]{"id", "accessCode"}, new Class[]{Long.class, String.class}, data)){throw new EndpointFailedException("insufficient data", EndpointFailedException.Reason.DataNotFound);}
+                return joinWithAccessCode((int)(long)data.get("id"), (String)data.get("accessCode"), auth);
+            }
+            default -> {Logger.log("could not find a endpoint [" + endpoint + "] in user", traceId);}
         }
         return null;
     }
@@ -229,6 +233,33 @@ public class UserEndpointManager {
         throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
     }
 
+    public String joinWithAccessCode(int id, String accessCode, AuthorizationProfile auth) throws EndpointFailedException {
+        if(!auth.isAdmin() && auth.getId() != id){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+        try {
+            int groupId = GroupEndpointManager.getIdFromAccessCode(accessCode);
+            String groupAccessCodeRand = DatabaseUtilities.queryString("access_code_rand", "group_table", groupId, connection);
+            if(groupAccessCodeRand == null){throw new EndpointFailedException("could not query sql data", EndpointFailedException.Reason.AccessDenied);}
+
+            byte[] groupAccessCodeRandBytes = ByteUtilities.fromHexString(groupAccessCodeRand);
+
+            String groupAccessCode = GroupEndpointManager.getAccessCode(groupId, groupAccessCodeRandBytes);
+
+            if(!Arrays.equals(groupAccessCode.getBytes(), accessCode.getBytes())){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
+
+            PreparedStatement statement = connection.prepareStatement("INSERT INTO user_group (user_id, group_id) VALUES (?, ?)");
+            statement.setInt(1, id);
+            statement.setInt(2, groupId);
+            int affected = statement.executeUpdate();
+            if(affected == 0){throw new EndpointFailedException("nothing changed", EndpointFailedException.Reason.NothingChanged);}
+            return "{\"success\":true}";
+
+        } catch (SQLException e) {
+            throw new EndpointFailedException("sql error", EndpointFailedException.Reason.UnexpectedError, e);
+        }
+
+
+    }
+
     public String createUser(String username, String password, String name, AuthorizationProfile auth) throws EndpointFailedException {
         try {
 
@@ -264,5 +295,7 @@ public class UserEndpointManager {
 
         }
     }
+
+
 
 }

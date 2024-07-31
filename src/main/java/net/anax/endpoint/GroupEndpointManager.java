@@ -55,7 +55,6 @@ public class GroupEndpointManager {
             case("rerollAccessCode") -> {
                 if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{String.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
                 return rerollAccessCode((int)(long) data.get("groupId"), auth);
-
             }
             default -> {Logger.log("could not find endpoint [" + endpoint + "] in grouop", traceId);}
         }
@@ -254,7 +253,7 @@ public class GroupEndpointManager {
         }
     }
 
-    int getIdFromAccessCode(String accessCode){
+    public static int getIdFromAccessCode(String accessCode){
         byte[] accessCodeBytes = StringUtilities.fromAccessCodeFormat(accessCode);
         byte[] idBytes = new byte[4];
         System.arraycopy(accessCodeBytes, 5, idBytes, 0, 4);
@@ -262,7 +261,7 @@ public class GroupEndpointManager {
 
     }
 
-    String getAccessCode(int id, byte[] accessCodeRand){
+    public static String getAccessCode(int id, byte[] accessCodeRand){
         byte[] idBytes = ByteUtilities.intToBytes(id);
         byte[] accessCodeBytes = ByteUtilities.concatenateByteArrays(accessCodeRand, idBytes);
         return StringUtilities.toAccessCodeFormat(accessCodeBytes);
