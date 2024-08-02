@@ -19,7 +19,7 @@ public class DatabaseAccessManager {
 
     EndpointManager endpointManager;
 
-    Connection connection;
+    private Connection connection;
 
     String database_username;
     String database_password;
@@ -55,7 +55,14 @@ public class DatabaseAccessManager {
             throw new RuntimeException(e);
         }
 
-        endpointManager = new EndpointManager(connection);
+        endpointManager = new EndpointManager();
+    }
+
+    public Connection getConnection() throws SQLException {
+        if(!connection.isValid(5)){
+            connection = DriverManager.getConnection("jdbc:mysql://" + database_address + "/schoolapp", database_username, database_password);
+        }
+        return connection;
     }
 
 

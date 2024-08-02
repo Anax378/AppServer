@@ -13,9 +13,9 @@ public class Authorization {
     static final int passwordHashIterations = 1000;
     static final int saltLength = 32;
 
-    public static boolean isMemberOfGroup(AuthorizationProfile auth, int group_id, Connection connection) {
+    public static boolean isMemberOfGroup(AuthorizationProfile auth, int group_id) {
         try {
-            PreparedStatement statement = connection.prepareStatement("Select 1 FROM user_group WHERE user_id=? AND group_id=?");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("Select 1 FROM user_group WHERE user_id=? AND group_id=?");
             statement.setInt(1, auth.getId());
             statement.setInt(2, group_id);
             return statement.executeQuery().next();
@@ -25,9 +25,9 @@ public class Authorization {
 
     }
 
-    public static boolean isParticipantIn(AuthorizationProfile auth, int task_id, Connection connection) {
+    public static boolean isParticipantIn(AuthorizationProfile auth, int task_id) {
         try {
-            PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_task WHERE user_id=? AND task_id=?");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT 1 FROM user_task WHERE user_id=? AND task_id=?");
             statement.setInt(1, auth.getId());
             statement.setInt(2, task_id);
             return statement.executeQuery().next();
@@ -36,9 +36,9 @@ public class Authorization {
         }
     }
 
-    public static boolean sharesGroupWith(AuthorizationProfile auth, int user_id, Connection connection) {
+    public static boolean sharesGroupWith(AuthorizationProfile auth, int user_id) {
         try {
-            PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM user_group WHERE user_id=? AND group_id IN (SELECT group_id FROM user_group WHERE user_id=?)");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT 1 FROM user_group WHERE user_id=? AND group_id IN (SELECT group_id FROM user_group WHERE user_id=?)");
             statement.setInt(1, auth.getId());
             statement.setInt(2, user_id);
             return statement.executeQuery().next();
@@ -49,9 +49,9 @@ public class Authorization {
 
     ;
 
-    public static boolean isAdminInGroup(AuthorizationProfile auth, int group_id, Connection connection) {
+    public static boolean isAdminInGroup(AuthorizationProfile auth, int group_id) {
         try {
-            PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM group_table WHERE id=? AND admin_id=?");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT 1 FROM group_table WHERE id=? AND admin_id=?");
             statement.setInt(1, group_id);
             statement.setInt(2, auth.getId());
             return statement.executeQuery().next();

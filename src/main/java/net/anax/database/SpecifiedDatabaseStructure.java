@@ -78,7 +78,7 @@ public class SpecifiedDatabaseStructure {
         }
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
-            if(auth.getId() != id && !auth.isAdmin() && !Authorization.sharesGroupWith(auth, id, connection)){return null;}
+            if(auth.getId() != id && !auth.isAdmin() && !Authorization.sharesGroupWith(auth, id)){return null;}
             switch(name){
                 case "id" -> {return new UserIdValueNode();}
                 case "username" -> {return new UserUsernameValueNode();}
@@ -284,7 +284,7 @@ public class SpecifiedDatabaseStructure {
         @Override public String getName() {return String.valueOf(id);}
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
-            if(!auth.isAdmin() && !Authorization.isMemberOfGroup(auth, id, connection)){return null;}
+            if(!auth.isAdmin() && !Authorization.isMemberOfGroup(auth, id)){return null;}
             switch (name){
                 case "id" -> {return new GroupIdValueNode();}
                 case "name" -> {return new GroupNameValueNode();}
@@ -311,19 +311,19 @@ public class SpecifiedDatabaseStructure {
         class GroupNameValueNode extends VirtualSimpleValueNode{
             public GroupNameValueNode() {super(connection, VirtualGroupNode.this.id, "name", VirtualGroupNode.table);}
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isAdminInGroup(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isAdminInGroup(auth, id);}
         }
         class GroupTreasurerUserIdNode extends VirtualSimpleValueNode{
             @Override
             public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
 
-                String treasurerIdString = DatabaseUtilities.queryString("treasurer_user_id", table, id, connection);
+                String treasurerIdString = DatabaseUtilities.queryString("treasurer_user_id", table, id);
                 if(treasurerIdString == null){return null;}
                 return new VirtualUserNode(Integer.parseInt(treasurerIdString), connection);
             }
             public GroupTreasurerUserIdNode() {super(connection, VirtualGroupNode.this.id, "treasurer_user_id", VirtualGroupNode.table);}
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isAdminInGroup(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isAdminInGroup(auth, id);}
         }
         class GroupUserIdNode extends AbstractVirtualNode{
             @Override
@@ -376,7 +376,7 @@ public class SpecifiedDatabaseStructure {
                 public boolean setData(String data, AuthorizationProfile auth) {
                     //TODO: improve user group adding system;
                     try {
-                        if(!Authorization.isMemberOfGroup(auth, id, connection)){return false;}
+                        if(!Authorization.isMemberOfGroup(auth, id)){return false;}
                         String content = this.readData(auth);
                         if(content != null){return false;}
                         JSONParser parser = new JSONParser();
@@ -455,7 +455,7 @@ public class SpecifiedDatabaseStructure {
                 super(connection, VirtualGroupNode.this.id, "admin_id", VirtualGroupNode.table);
             }
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isAdminInGroup(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isAdminInGroup(auth, id);}
         }
     }
     static class VirtualTaskNode extends AbstractVirtualNode{
@@ -468,7 +468,7 @@ public class SpecifiedDatabaseStructure {
         }
         @Override
         public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
-            if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id, connection)){return null;}
+            if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id)){return null;}
             switch(name){
                 case "id" -> {return new TaskIdVirtualNode();}
                 case "type" -> {return new TaskTypeVirtualValueNode();}
@@ -490,7 +490,7 @@ public class SpecifiedDatabaseStructure {
         class TaskTypeVirtualValueNode extends VirtualSimpleValueNode{
             public TaskTypeVirtualValueNode() {super(connection, VirtualTaskNode.this.id, "type", VirtualTaskNode.table);}
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id);}
 
             public enum Type {
                 Homework(0),
@@ -504,20 +504,20 @@ public class SpecifiedDatabaseStructure {
         class TaskDueTimeStampValueNode extends VirtualSimpleValueNode{
             public TaskDueTimeStampValueNode() {super(connection, VirtualTaskNode.this.id,"due_timestamp", VirtualTaskNode.table);}
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id);}
         }
         class TaskDescriptionValueNode extends VirtualSimpleValueNode{
             public TaskDescriptionValueNode() {super(connection, VirtualTaskNode.this.id, "description", VirtualTaskNode.table);}
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id);}
         }
         class TaskGroupIdValueNode extends VirtualSimpleValueNode{
             public TaskGroupIdValueNode() {super(connection, VirtualTaskNode.this.id, "group_id", VirtualTaskNode.table);}
             @Override public boolean authRead(AuthorizationProfile auth) {return true;}//TODO: implement task read auth;
-            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id, connection);}
+            @Override public boolean authSet(AuthorizationProfile auth) {return Authorization.isParticipantIn(auth, id);}
             @Override
             public AbstractVirtualNode getChildNode(String name, AuthorizationProfile auth) {
-                String groupIdString = DatabaseUtilities.queryString("group_id", table, id, connection);
+                String groupIdString = DatabaseUtilities.queryString("group_id", table, id);
                 if(groupIdString == null){return null;}
                 return new VirtualGroupNode(Integer.parseInt(groupIdString), connection).getChildNode(name, auth);
             }
@@ -542,7 +542,7 @@ public class SpecifiedDatabaseStructure {
             @Override
             public boolean setData(String data, AuthorizationProfile auth) {
                 try {
-                    if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id, connection)){return false;}
+                    if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id)){return false;}
                     String currentData = this.readData(auth);
 
                     JSONParser parser = new JSONParser();
@@ -628,7 +628,7 @@ public class SpecifiedDatabaseStructure {
                 }
                 @Override public boolean setData(String data, AuthorizationProfile auth) {
                     try {
-                        if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id, connection)){return false;}
+                        if(!auth.isAdmin() && !Authorization.isParticipantIn(auth, id)){return false;}
 
                         String currentData = this.readData(auth);
                         if(currentData != null){return false;}

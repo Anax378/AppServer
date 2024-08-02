@@ -23,10 +23,8 @@ import java.util.Arrays;
 import java.util.UUID;
 
 public class UserEndpointManager {
-    Connection connection;
 
-    public UserEndpointManager(Connection connection){
-        this.connection = connection;
+    public UserEndpointManager(){
     }
 
     public String callEndpoint(String endpoint, JSONObject data, AuthorizationProfile auth, long traceId) throws EndpointFailedException {
@@ -73,7 +71,7 @@ public class UserEndpointManager {
 
     public String login(String username, String passwordAttempt, KeyManager keyManager) throws EndpointFailedException {
         try {
-            PreparedStatement statement = connection.prepareStatement("SELECT password_hash, hash_salt, id FROM user WHERE username=?");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT password_hash, hash_salt, id FROM user WHERE username=?");
             statement.setString(1, username);
             ResultSet set = statement.executeQuery();
 
@@ -124,8 +122,8 @@ public class UserEndpointManager {
 
     }
     public String getUsername(int id, AuthorizationProfile auth) throws EndpointFailedException {
-        if (auth.isAdmin() || auth.getId() == id || Authorization.sharesGroupWith(auth, id, connection)) {
-            String username = DatabaseUtilities.queryString("username", "user", id, connection);
+        if (auth.isAdmin() || auth.getId() == id || Authorization.sharesGroupWith(auth, id)) {
+            String username = DatabaseUtilities.queryString("username", "user", id);
             if(username == null){
                 throw new EndpointFailedException("could not retrieve data", EndpointFailedException.Reason.DataNotFound);
             }
@@ -141,7 +139,7 @@ public class UserEndpointManager {
         if(!auth.isAdmin() && auth.getId() != id){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
 
         try {
-            PreparedStatement statement = connection.prepareStatement("UPDATE user SeT name=? WHERE id=?");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("UPDATE user SeT name=? WHERE id=?");
             statement.setString(1, newName);
             statement.setInt(2, id);
             if(statement.executeUpdate() == 0){throw new EndpointFailedException("nothing changed" ,EndpointFailedException.Reason.NothingChanged);}
@@ -154,11 +152,11 @@ public class UserEndpointManager {
     }
 
     public String getName(int id, AuthorizationProfile auth) throws EndpointFailedException {
-        if(!auth.isAdmin() && auth.getId() != id && !Authorization.sharesGroupWith(auth, id, connection)){
+        if(!auth.isAdmin() && auth.getId() != id && !Authorization.sharesGroupWith(auth, id)){
             throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);
         }
 
-        String name = DatabaseUtilities.queryString("name", "user", id, connection);
+        String name = DatabaseUtilities.queryString("name", "user", id);
         if(name == null){throw new EndpointFailedException("Data not found", EndpointFailedException.Reason.DataNotFound);}
 
         JSONObject data = new JSONObject();
@@ -172,10 +170,10 @@ public class UserEndpointManager {
         if(auth.isAdmin() || auth.getId() == id){
             try {
                 JSONObject data = new JSONObject();
-                String username = DatabaseUtilities.queryString("username", "user", id, connection);
+                String username = DatabaseUtilities.queryString("username", "user", id);
                 data.put("username", username);
 
-                PreparedStatement statement = connection.prepareStatement("SELECT task_id, is_done FROM user_task WHERE user_id=?");
+                PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT task_id, is_done FROM user_task WHERE user_id=?");
                 statement.setInt(1, id);
                 ResultSet resultSet = statement.executeQuery();
 
@@ -191,7 +189,7 @@ public class UserEndpointManager {
                 data.put("taskIds", task_id_array);
                 data.put("isTaskDone", is_done_array);
 
-                PreparedStatement group_statement = connection.prepareStatement("SELECT group_id FROM user_group WHERE user_id=?");
+                PreparedStatement group_statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT group_id FROM user_group WHERE user_id=?");
                 group_statement.setInt(1, id);
                 ResultSet result = group_statement.executeQuery();
 
@@ -201,7 +199,7 @@ public class UserEndpointManager {
                     group_id_array.add(result.getInt("group_id"));
                 }
 
-                data.put("name", DatabaseUtilities.queryString("name", "user", id, connection));
+                data.put("name", DatabaseUtilities.queryString("name", "user", id));
 
                 data.put("groupIds", group_id_array);
 
@@ -217,7 +215,7 @@ public class UserEndpointManager {
     public String setUsername(int id, String newUsername, AuthorizationProfile auth) throws EndpointFailedException {
         if(auth.isAdmin() || auth.getId() == id){
             try {
-                PreparedStatement statement = connection.prepareStatement("UPDATE user SET username=? WHERE id=?");
+                PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("UPDATE user SET username=? WHERE id=?");
                 statement.setString(1, newUsername);
                 statement.setInt(2, id);
                 int affected = statement.executeUpdate();
@@ -237,7 +235,7 @@ public class UserEndpointManager {
         if(!auth.isAdmin() && auth.getId() != id){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
         try {
             int groupId = GroupEndpointManager.getIdFromAccessCode(accessCode);
-            String groupAccessCodeRand = DatabaseUtilities.queryString("access_code_rand", "group_table", groupId, connection);
+            String groupAccessCodeRand = DatabaseUtilities.queryString("access_code_rand", "group_table", groupId);
             if(groupAccessCodeRand == null){throw new EndpointFailedException("could not query sql data", EndpointFailedException.Reason.AccessDenied);}
 
             byte[] groupAccessCodeRandBytes = ByteUtilities.fromHexString(groupAccessCodeRand);
@@ -246,7 +244,7 @@ public class UserEndpointManager {
 
             if(!Arrays.equals(groupAccessCode.getBytes(), accessCode.getBytes())){throw new EndpointFailedException("Access Denied", EndpointFailedException.Reason.AccessDenied);}
 
-            PreparedStatement statement = connection.prepareStatement("INSERT INTO user_group (user_id, group_id) VALUES (?, ?)");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("INSERT INTO user_group (user_id, group_id) VALUES (?, ?)");
             statement.setInt(1, id);
             statement.setInt(2, groupId);
             int affected = statement.executeUpdate();
@@ -266,7 +264,7 @@ public class UserEndpointManager {
             byte[] salt = Authorization.generateSalt();
             byte[] passwordHash = Authorization.generatePasswordHash(password, salt);
 
-            PreparedStatement statement = connection.prepareStatement("INSERT INTO user (username, password_hash, hash_salt, name) VALUES (?, ?, ?, ?);", Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("INSERT INTO user (username, password_hash, hash_salt, name) VALUES (?, ?, ?, ?);", Statement.RETURN_GENERATED_KEYS);
 
             statement.setString(1, username);
             statement.setString(2, ByteUtilities.toHexString(passwordHash));

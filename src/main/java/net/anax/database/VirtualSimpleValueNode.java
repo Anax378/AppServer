@@ -30,7 +30,7 @@ public abstract class VirtualSimpleValueNode extends AbstractVirtualNode {
         if(!this.authRead(auth)){
             return null;
         }
-        return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString(field, table, id, connection), field);
+        return StringUtilities.simpleWrapInJson(DatabaseUtilities.queryString(field, table, id), field);
     }
 
     @Override

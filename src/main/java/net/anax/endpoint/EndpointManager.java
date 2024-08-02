@@ -1,26 +1,22 @@
 package net.anax.endpoint;
 
 import net.anax.VirtualFileSystem.AuthorizationProfile;
-import net.anax.cryptography.KeyManager;
+import net.anax.database.DatabaseAccessManager;
 import net.anax.logging.Logger;
 import org.json.simple.JSONObject;
 
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Arrays;
 
 public class EndpointManager {
-    Connection connection;
     UserEndpointManager userEndpointManager;
     GroupEndpointManager groupEndpointManager;
     TaskEndpointManager taskEndpointManager;
 
-    public EndpointManager(Connection connection){
-        this.connection = connection;
-        userEndpointManager = new UserEndpointManager(connection);
-        groupEndpointManager = new GroupEndpointManager(connection);
-        taskEndpointManager = new TaskEndpointManager(connection);
+    public EndpointManager(){
+        userEndpointManager = new UserEndpointManager();
+        groupEndpointManager = new GroupEndpointManager();
+        taskEndpointManager = new TaskEndpointManager();
     }
 
     public String callEndpoint(String path, JSONObject data, AuthorizationProfile auth, long traceId) throws EndpointFailedException {
@@ -32,7 +28,7 @@ public class EndpointManager {
         String ret = null;
 
         try {
-            PreparedStatement statement = connection.prepareStatement("START TRANSACTION;");
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("START TRANSACTION;");
             statement.execute();
         } catch (SQLException e) {
             throw new EndpointFailedException("could not start sql transaction", EndpointFailedException.Reason.UnexpectedError);
@@ -49,7 +45,7 @@ public class EndpointManager {
             }
         } catch(EndpointFailedException e){
             try {
-                PreparedStatement rollback = connection.prepareStatement("ROLLBACK;");
+                PreparedStatement rollback = DatabaseAccessManager.getInstance().getConnection().prepareStatement("ROLLBACK;");
                 rollback.execute();
                 Logger.log("rolling back unsuccessful endpoint call", traceId);
                 throw e;
@@ -60,7 +56,7 @@ public class EndpointManager {
         }
 
         try {
-            PreparedStatement commit = connection.prepareStatement("COMMIT;");
+            PreparedStatement commit = DatabaseAccessManager.getInstance().getConnection().prepareStatement("COMMIT;");
             commit.execute();
         } catch (SQLException e) {
             Logger.error("failed to commit transaction", traceId);
