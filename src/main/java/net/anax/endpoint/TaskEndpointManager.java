@@ -8,6 +8,9 @@ import net.anax.util.JsonUtilities;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import java.sql.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 
 public class TaskEndpointManager {
     public TaskEndpointManager() {
@@ -140,6 +143,12 @@ public class TaskEndpointManager {
             statement.setInt(1, type);
             statement.setTimestamp(2, new Timestamp(dueTimeStamp));
             statement.setString(3, description);
+
+            HashSet<Integer> idSet = new HashSet<>();
+            for(int id : userIds){idSet.add(id);}
+            idSet.add(authorUserId);
+
+            userIds = idSet.stream().mapToInt(Number::intValue).toArray();
 
             int affected = statement.executeUpdate();
             if (affected == 0) {
