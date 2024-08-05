@@ -49,7 +49,7 @@ public class GroupEndpointManager {
                 return removeTreasurer((int)(long) data.get("groupId"), auth);
             }
             case("rerollAccessCode") -> {
-                if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{String.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
+                if(!JsonUtilities.validateKeys(new String[]{"groupId"}, new Class<?>[]{Long.class}, data)){throw new EndpointFailedException("necessary data not found", EndpointFailedException.Reason.DataNotFound);}
                 return rerollAccessCode((int)(long) data.get("groupId"), auth);
             }
             default -> {Logger.log("could not find endpoint [" + endpoint + "] in grouop", traceId);}
