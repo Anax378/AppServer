@@ -60,7 +60,7 @@ public class WorkerThread extends Thread{
             HTTPRequest mainRequest = parser.parseRequest(inputStream, traceId);
 
             Logger.info("main request bytes: " + Arrays.toString(mainRequest.getRawInput()), traceId);
-            Logger.info("main request string interpretation: \n" + new String(mainRequest.getRawInput(), StandardCharsets.US_ASCII), traceId);
+            Logger.info("main request string interpretation: \n" + new String(mainRequest.getRawInput(), StandardCharsets.UTF_8), traceId);
 
             if(mainRequest.getMethod() == HTTPMethod.UNKNOWN){
                 throw new HTTPParsingException(HTTPStatusCode.SERVER_ERROR_501_NOT_IMPLEMENTED, "method not recognized");
@@ -74,7 +74,7 @@ public class WorkerThread extends Thread{
                 workingRequest = wrapperRequest.getUnderlyingRequest(traceId);
 
                 Logger.info("underlying request bytes: " + Arrays.toString(workingRequest.getRawInput()), traceId);
-                Logger.info("underlying request string interpretation: \n" + new String(workingRequest.getRawInput(), StandardCharsets.US_ASCII), traceId);
+                Logger.info("underlying request string interpretation: \n" + new String(workingRequest.getRawInput(), StandardCharsets.UTF_8), traceId);
 
                 useRSARelay = true;
                 aesKey = wrapperRequest.getAESKey();

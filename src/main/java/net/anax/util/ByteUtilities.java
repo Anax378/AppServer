@@ -24,7 +24,7 @@ public class ByteUtilities {
     }
 
     public static boolean checkEndEquals(byte[] bytes, String toMatch){
-        byte[] match = toMatch.getBytes(StandardCharsets.US_ASCII);
+        byte[] match = toMatch.getBytes(StandardCharsets.UTF_8);
         if (match.length > bytes.length){return false;}
         for(int i = 0; i < match.length; i++){
             if(match[match.length-i-1] != bytes[bytes.length-i-1]){

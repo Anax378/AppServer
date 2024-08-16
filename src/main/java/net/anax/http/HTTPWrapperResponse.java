@@ -48,7 +48,7 @@ public class HTTPWrapperResponse {
 
             cipher.init(Cipher.ENCRYPT_MODE, key.getkey(), ivSpec);
 
-            byte[] data = cipher.doFinal(responseJson.toJSONString().getBytes(StandardCharsets.US_ASCII));
+            byte[] data = cipher.doFinal(responseJson.toJSONString().getBytes(StandardCharsets.UTF_8));
             String encodedResponse = Base64.getEncoder().encodeToString(data);
 
             HTTPResponse wrapperResponse = new HTTPResponse(HTTPVersion.HTTP_1_1, HTTPStatusCode.OK_200);

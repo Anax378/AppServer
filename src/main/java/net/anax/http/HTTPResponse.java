@@ -80,8 +80,8 @@ public class HTTPResponse {
 
     public void writeOnStream(OutputStream outputStream, long traceId) {
         try {
-            Logger.info("writing on outputStream: " + Arrays.toString(this.getData().getBytes(StandardCharsets.US_ASCII)), traceId);
-            outputStream.write(this.getData().getBytes(StandardCharsets.US_ASCII));
+            Logger.info("writing on outputStream: " + Arrays.toString(this.getData().getBytes(StandardCharsets.UTF_8)), traceId);
+            outputStream.write(this.getData().getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             Logger.error("IOException when writing on outputStream", traceId);
             Logger.logException(e, traceId);
