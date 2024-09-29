@@ -4,6 +4,7 @@ import net.anax.VirtualFileSystem.AuthorizationProfile;
 import net.anax.database.Authorization;
 import net.anax.database.DatabaseAccessManager;
 import net.anax.logging.Logger;
+import net.anax.util.DatabaseUtilities;
 import net.anax.util.JsonUtilities;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -24,13 +25,13 @@ public class TaskEndpointManager {
             }
 
             case("createTask") -> {
-                if(!JsonUtilities.validateKeys(new String[]{"dueTimestamp", "description", "type", "authorUserId", "userIds"}, new Class<?>[]{Long.class, String.class, Long.class, Long.class, JSONArray.class}, data)){throw new EndpointFailedException("necessary data not provided", EndpointFailedException.Reason.DataNotFound);}
+                if(!JsonUtilities.validateKeys(new String[]{"dueTimestamp", "description", "type", "authorUserId", "userIds", "startTimestamp", "name"}, new Class<?>[]{Long.class, String.class, Long.class, Long.class, JSONArray.class, Long.class, String.class}, data)){throw new EndpointFailedException("necessary data not provided", EndpointFailedException.Reason.DataNotFound);}
                 JSONArray array = (JSONArray) data.get("userIds");
                 if (!array.isEmpty() && !Long.class.isInstance(array.get(0))){throw new EndpointFailedException("necessary data not provided", EndpointFailedException.Reason.DataNotFound);}
                 int[] userIds = new int[array.size()];
                 for(int i = 0; i < userIds.length; i++){userIds[i] = (int)(long) array.get(i);}
 
-                return createTask((long) data.get("dueTimestamp"), (String) data.get("description"), (int)(long) data.get("type"), (int)(long) data.get("authorUserId"), userIds, auth);
+                return createTask((long) data.get("dueTimestamp"), (long)data.get("startTimestamp"),(String) data.get("name") ,(String) data.get("description"), (int)(long) data.get("type"), (int)(long) data.get("authorUserId"), userIds, auth);
 
             }
             case("setDueTimestamp") -> {
@@ -113,6 +114,17 @@ public class TaskEndpointManager {
             }
             data.put("groupId", groupIdSet.getInt("group_id"));
 
+            String name = DatabaseUtilities.queryString("name", "task", taskId);
+            data.put("name", name);
+
+            ResultSet startTimestampResult = DatabaseUtilities.regularQuery("start_timestamp", "task", taskId);
+
+            if(!startTimestampResult.next()){
+                throw new EndpointFailedException("data not found: start_timestamp", EndpointFailedException.Reason.DataNotFound);
+            }
+
+            data.put("startTimestamp", startTimestampResult.getTimestamp("start_timestamp").getTime());
+
             PreparedStatement amountStatement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("SELECT amount FROM payment_task WHERE parent_id=?");
             amountStatement.setInt(1, taskId);
             ResultSet amountSet = amountStatement.executeQuery();
@@ -137,12 +149,14 @@ public class TaskEndpointManager {
         }
     }
 
-    public String createTask(long dueTimeStamp, String description, int type, int authorUserId, int[] userIds, AuthorizationProfile auth) throws EndpointFailedException {
+    public String createTask(long dueTimeStamp, long startTimestamp, String name, String description, int type, int authorUserId, int[] userIds, AuthorizationProfile auth) throws EndpointFailedException {
         try {
-            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("INSERT INTO task (type, due_timestamp, description) VALUES (?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement statement = DatabaseAccessManager.getInstance().getConnection().prepareStatement("INSERT INTO task (type, due_timestamp, description, name, start_timestamp) VALUES (?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
             statement.setInt(1, type);
             statement.setTimestamp(2, new Timestamp(dueTimeStamp));
             statement.setString(3, description);
+            statement.setString(4, name);
+            statement.setTimestamp(5, new Timestamp(startTimestamp));
 
             HashSet<Integer> idSet = new HashSet<>();
             for(int id : userIds){idSet.add(id);}
